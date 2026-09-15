@@ -1,0 +1,9 @@
+{
+  "name": "filo-takip-panel",
+  "private": true,
+  "type": "module",
+  "description": "Filo Takip yönetim paneli. Çalışma zamanında bağımlılık ve derleme adımı yoktur; bu dosya Node'un .js dosyalarını ES modülü sayması için var. jsdom yalnızca görünüm testleri için, isteğe bağlıdır: npm install --no-save jsdom",
+  "scripts": {
+    "test": "node --test"
+  }
+}

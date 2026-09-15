@@ -60,6 +60,31 @@ sağlayıcısı yerine doğrudan Android `LocationManager` üzerinden okunur
 (gerekçe [location_task_handler.dart](lib/services/location_task_handler.dart)
 içinde yazılı).
 
+## Web paneli
+
+`filo-takip.perinet.org` adresinde yayınlanan yönetim paneli
+[panel/](panel/) klasöründedir. Aynı Realtime Database'i okur; araç kaydı ve
+konum gönderimi yalnızca uygulamadan yapılır.
+
+Görünümü rol belirler ve rol veritabanından okunur:
+
+| Rol | Nereden okunur | Ne görür |
+| --- | --- | --- |
+| Yönetici | `admins/{uid}` var | Harita, Araçlar, Gruplar, Kullanıcılar, Ayarlar |
+| İzleyici | `webUsers/{uid}.approved` doğru | Yalnızca kendi grubunun araçları, salt-okunur |
+| Onay bekliyor | ikisi de yok | Yalnızca bekleme ekranı |
+
+Panel de uygulama gibi iki kiple çalışır: `panel/js/config.js` boşken demo
+verisi, Firebase yapılandırması girilince gerçek veritabanı. Derleme adımı
+yoktur, tarayıcının ES modülleri kullanılır.
+
+```bash
+docker compose -f /opt/filo-takip/panel/deploy/docker-compose.yml up -d
+cd panel && node --test        # saf mantık testleri
+```
+
+Ayrıntılar, demo hesapları ve yayınlama adımları: [panel/README.md](panel/README.md).
+
 ## Güvenlik kuralları
 
 [database.rules.json](database.rules.json) dosyası Realtime Database kurallarını
@@ -80,6 +105,7 @@ lib/
   screens/           harita, kayıt, yönetim, ayarlar
   widgets/           paylaşılan küçük widget'lar
 test/                saf mantık birim testleri (Firebase gerektirmez)
+panel/               web yönetim paneli (statik, derlemesiz) — panel/README.md
 ```
 
 Kod üretimi (`build_runner`, `freezed`, `json_serializable`) **kullanılmaz**.
