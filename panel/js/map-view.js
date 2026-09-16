@@ -8,8 +8,28 @@
 import { Strings } from './strings.js';
 import { el } from './ui.js';
 import { formatCoords, formatSpeed, relativeTime } from './time-format.js';
-import { mapDefaults } from './config.js';
-import { statusColor, statusLabel, vehicleStatusOf } from './vehicle-status.js';
+import { defaultMapLayerId, mapDefaults, mapLayers } from './config.js';
+import { VehicleStatus, statusColor, statusLabel, vehicleStatusOf } from './vehicle-status.js';
+
+// Seçilen harita katmanı tarayıcıda hatırlanır.
+const LAYER_KEY = 'filo-takip-harita-katmani';
+
+function readStoredLayerId() {
+  try {
+    return window.localStorage.getItem(LAYER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredLayerId(id) {
+  try {
+    if (id === null) window.localStorage.removeItem(LAYER_KEY);
+    else window.localStorage.setItem(LAYER_KEY, id);
+  } catch {
+    // Depolama kapalıysa seçim yalnızca bu oturumda yaşar.
+  }
+}
 
 // İşaretçi ölçüsü. Sivri uç tam koordinatın üstünde dursun diye tutturma
 // noktası alt uçtadır.
@@ -43,7 +63,13 @@ export class MapView {
     this._markers = new Map();
     this._selectedId = null;
     this._followSelected = false;
-    this._track = null;
+    this._route = null;
+    this._stopMarkers = [];
+    this._playbackMarker = null;
+    // Geçmiş rotası açıkken canlı işaretçiler gizlenir.
+    this._liveVisible = true;
+    this._zoneLayers = new Map();
+    this._pickHandler = null;
     // İlk veri gelince haritayı filoya sığdırmak için; sonraki
     // güncellemelerde kullanıcının kaydırdığı görünüm korunur.
     this._didInitialFit = false;
@@ -56,14 +82,103 @@ export class MapView {
       attributionControl: true,
     });
 
-    L.tileLayer(mapDefaults.tileUrl, {
-      maxZoom: 19,
-      attribution: Strings.mapAttribution,
-    }).addTo(this._map);
+    this._addBaseLayers();
 
     this._map.on('dragstart', () => {
       this._followSelected = false;
     });
+  }
+
+  // Sokak / uydu katmanları ve sağ üstteki seçici.
+  //
+  // Seçim tarayıcıda hatırlanır: filoyu uydu üzerinde izlemeyi tercih eden
+  // biri her açılışta yeniden seçmek zorunda kalmasın.
+  _addBaseLayers() {
+    const options = {};
+    let active = null;
+    const savedId = readStoredLayerId();
+
+    for (const layer of mapLayers) {
+      const tiles = L.tileLayer(layer.url, {
+        maxZoom: layer.maxZoom,
+        attribution: layer.attribution,
+      });
+      // Etiket katmanı varsa taban ve etiketler birlikte tek katman sayılır.
+      const base = layer.labelsUrl
+        ? L.layerGroup([tiles, L.tileLayer(layer.labelsUrl, { maxZoom: layer.maxZoom })])
+        : tiles;
+
+      options[layer.label] = base;
+      const wanted = savedId !== null ? savedId : defaultMapLayerId;
+      if (layer.id === wanted) active = base;
+      base.filoLayerId = layer.id;
+    }
+
+    // Kayıtlı kimlik artık tanınmıyorsa ilk katmana düşülür.
+    (active ?? Object.values(options)[0]).addTo(this._map);
+
+    L.control.layers(options, null, { position: 'topright' }).addTo(this._map);
+    this._map.on('baselayerchange', (event) => {
+      writeStoredLayerId(event.layer?.filoLayerId ?? null);
+    });
+  }
+
+  // ------------------------------------------------------------- Bölgeler
+
+  // Tanımlı bölgeleri daire olarak çizer. Kimliğe göre saklanır: her veri
+  // güncellemesinde yeniden kurmak haritayı titretirdi.
+  showGeofences(zones) {
+    const seen = new Set();
+    for (const zone of zones) {
+      seen.add(zone.id);
+      let circle = this._zoneLayers.get(zone.id);
+      if (circle === undefined) {
+        circle = L.circle([zone.lat, zone.lng], {
+          radius: zone.radiusM,
+          color: '#6A1B9A',
+          weight: 2,
+          fillColor: '#6A1B9A',
+          fillOpacity: 0.08,
+          interactive: false,
+        }).addTo(this._map);
+        this._zoneLayers.set(zone.id, circle);
+      } else {
+        circle.setLatLng([zone.lat, zone.lng]);
+        circle.setRadius(zone.radiusM);
+      }
+      circle.bindTooltip(el('span', { class: 'map-plate', text: zone.name }), {
+        permanent: true,
+        direction: 'center',
+        className: 'map-tooltip map-tooltip-zone',
+      });
+    }
+    for (const [id, circle] of [...this._zoneLayers]) {
+      if (seen.has(id)) continue;
+      circle.remove();
+      this._zoneLayers.delete(id);
+    }
+  }
+
+  // Bölge merkezi seçme kipi: bir sonraki harita tıklaması koordinatı verir.
+  startPicking(onPick) {
+    this.stopPicking();
+    this._pickHandler = (event) => {
+      this.stopPicking();
+      onPick(event.latlng.lat, event.latlng.lng);
+    };
+    this._map.on('click', this._pickHandler);
+    this._map.getContainer().classList.add('map-picking');
+  }
+
+  stopPicking() {
+    if (this._pickHandler === null) return;
+    this._map.off('click', this._pickHandler);
+    this._pickHandler = null;
+    this._map.getContainer().classList.remove('map-picking');
+  }
+
+  get picking() {
+    return this._pickHandler !== null;
   }
 
   // Harita bir sekme gizliyken kurulduysa Leaflet boyutunu yanlış ölçer.
@@ -105,6 +220,7 @@ export class MapView {
 
   // vehicles: haritada gösterilecek araçlar (görünürlük filtresi uygulanmış).
   render(vehicles, { groups, viewer, nowMs, fieldVisibilityFor }) {
+    if (!this._liveVisible) return;
     const seen = new Set();
 
     for (const vehicle of vehicles) {
@@ -182,31 +298,82 @@ export class MapView {
     this._map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
   }
 
-  // Konum geçmişi ekranından çağrılır: aracın rotasını haritaya çizer.
-  drawTrack(samples) {
-    this.clearTrack();
+  // ------------------------------------------------------- Geçmiş rotası
+
+  // Aracın rotasını, duraklarını ve oynatma işaretçisini haritaya koyar.
+  // Canlı işaretçiler bu sırada gizlenir; yoksa aynı araç iki yerde görünür.
+  showRoute(samples, stops) {
+    this.clearRoute();
     const points = samples
       .filter((sample) => sample.lat !== 0 || sample.lng !== 0)
       .map((sample) => [sample.lat, sample.lng]);
-    if (points.length < 2) return false;
-    this._track = L.polyline(points, {
-      color: '#1565C0',
-      weight: 4,
-      opacity: 0.75,
-    }).addTo(this._map);
-    this._map.fitBounds(this._track.getBounds(), { padding: [48, 48] });
-    return true;
+    if (points.length === 0) return 0;
+
+    if (points.length >= 2) {
+      // Alttaki kalın açık çizgi rotayı haritadan ayırır, üstteki ince koyu
+      // çizgi yönü okunur kılar.
+      this._route = L.layerGroup([
+        L.polyline(points, { color: '#ffffff', weight: 7, opacity: 0.85 }),
+        L.polyline(points, { color: '#1565C0', weight: 3.5, opacity: 0.95 }),
+      ]).addTo(this._map);
+      this._map.fitBounds(L.latLngBounds(points), { padding: [56, 56] });
+    }
+
+    for (const stop of stops ?? []) {
+      const marker = L.circleMarker([stop.lat, stop.lng], {
+        radius: 7,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: '#455A64',
+        fillOpacity: 0.95,
+      }).addTo(this._map);
+      marker.bindTooltip(
+        el('span', { class: 'map-plate', text: `${Strings.stopLabel} · ${stop.label}` }),
+        { direction: 'top', className: 'map-tooltip' },
+      );
+      this._stopMarkers.push(marker);
+    }
+    return points.length;
   }
 
-  clearTrack() {
-    if (this._track !== null) {
-      this._track.remove();
-      this._track = null;
+  // Oynatma sırasında aracın o andaki yeri.
+  setPlaybackPosition(sample, { follow = false } = {}) {
+    if (sample === null || sample === undefined) return;
+    const latLng = [sample.lat, sample.lng];
+    if (this._playbackMarker === null) {
+      this._playbackMarker = L.marker(latLng, {
+        icon: this._iconFor(VehicleStatus.moving, true),
+        zIndexOffset: 2000,
+        keyboard: false,
+      }).addTo(this._map);
+    } else {
+      this._playbackMarker.setLatLng(latLng);
+    }
+    if (follow && !this._map.getBounds().pad(-0.15).contains(latLng)) {
+      this._map.panTo(latLng, { animate: true });
     }
   }
 
-  get hasTrack() {
-    return this._track !== null;
+  clearRoute() {
+    if (this._route !== null) {
+      this._route.remove();
+      this._route = null;
+    }
+    for (const marker of this._stopMarkers) marker.remove();
+    this._stopMarkers = [];
+    if (this._playbackMarker !== null) {
+      this._playbackMarker.remove();
+      this._playbackMarker = null;
+    }
+  }
+
+  // Canlı araç işaretçilerini gizler/gösterir. Gizlenince işaretçiler
+  // haritadan kaldırılır; sonraki render çağrısı yeniden kurar.
+  setLiveMarkersVisible(visible) {
+    this._liveVisible = visible;
+    if (visible) return;
+    for (const entry of this._markers.values()) entry.marker.remove();
+    this._markers.clear();
   }
 
   destroy() {

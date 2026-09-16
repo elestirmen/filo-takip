@@ -9,8 +9,12 @@
 import { Role } from './models.js';
 import { Strings } from './strings.js';
 import { createBackend } from './backend.js';
+import { createAlertCenter } from './alert-center.js';
+import { openAlertsModal } from './view-alerts.js';
+import { visibleVehiclesFor } from './visibility-rules.js';
 import { createGroupsPage } from './view-groups.js';
 import { createMapPage } from './view-map.js';
+import { createReportsPage } from './view-reports.js';
 import { createSettingsPage } from './view-settings.js';
 import { createUsersPage } from './view-users.js';
 import { createVehiclesPage } from './view-vehicles.js';
@@ -44,6 +48,7 @@ async function boot() {
   backend.vehicles.listen(() => renderIfShell());
   backend.groups.listen(() => renderIfShell());
   backend.users.listen(() => renderIfShell());
+  backend.geofences.listen(() => renderIfShell());
   backend.adminUids.listen(() => renderIfShell());
 
   window.setInterval(() => renderIfShell(), REFRESH_MS);
@@ -55,6 +60,7 @@ function currentState() {
     vehicles: backend.vehicles.value,
     groups: backend.groups.value,
     users: backend.users.value,
+    geofences: backend.geofences.value,
     adminUids: backend.adminUids.value,
     nowMs: backend.nowMs(),
   };
@@ -136,6 +142,10 @@ function showBootError(message) {
 function createShell(backend, viewer) {
   const isAdmin = viewer.role === Role.admin;
 
+  // Uyarılar yalnızca **bu kullanıcının görebildiği** araçlar için üretilir;
+  // izleyiciye göremediği bir aracın hız aşımını bildirmek anlamsız olurdu.
+  const alertCenter = createAlertCenter({ onChange: () => refreshAlertButton() });
+
   const mapPage = createMapPage(backend);
   const vehiclesPage = isAdmin
     ? createVehiclesPage(backend, {
@@ -143,8 +153,15 @@ function createShell(backend, viewer) {
           activate('map');
           mapPage.focusVehicle(vehicleId);
         },
+        // Geçmiş, haritanın yan sütununda oynatma paneli olarak açılır;
+        // araç tablosuyla harita aynı düğmeye aynı şeyi yapsın.
+        onShowHistory: (vehicle) => {
+          activate('map');
+          mapPage.openPlayback(vehicle);
+        },
       })
     : null;
+  const reportsPage = isAdmin ? createReportsPage(backend) : null;
   const groupsPage = isAdmin ? createGroupsPage(backend) : null;
   const usersPage = isAdmin ? createUsersPage(backend) : null;
   const settingsPage = createSettingsPage(backend);
@@ -152,6 +169,7 @@ function createShell(backend, viewer) {
   const tabs = [
     { id: 'map', label: Strings.navMap, page: mapPage },
     isAdmin ? { id: 'vehicles', label: Strings.navVehicles, page: vehiclesPage } : null,
+    isAdmin ? { id: 'reports', label: Strings.navReports, page: reportsPage } : null,
     isAdmin ? { id: 'groups', label: Strings.navGroups, page: groupsPage } : null,
     isAdmin ? { id: 'users', label: Strings.navUsers, page: usersPage } : null,
     { id: 'settings', label: Strings.navSettings, page: settingsPage },
@@ -163,6 +181,25 @@ function createShell(backend, viewer) {
   const content = el('main', { class: 'content' });
   const navHost = el('nav', { class: 'nav', 'aria-label': Strings.panelTitle });
   const pendingBadge = el('span', { class: 'nav-count' });
+
+  const alertCount = el('span', { class: 'nav-count' });
+  const alertButton = el('button', {
+    type: 'button',
+    class: 'btn btn-ghost btn-small',
+    title: Strings.alertsTitle,
+    onclick: () => {
+      alertCenter.markSeen();
+      openAlertsModal(alertCenter);
+    },
+  }, [Strings.alertsOpen, alertCount]);
+
+  function refreshAlertButton() {
+    const unseen = alertCenter.unseenCount();
+    alertCount.textContent = unseen > 0 ? String(unseen) : '';
+    alertCount.hidden = unseen === 0;
+    alertButton.classList.toggle('btn-active', unseen > 0);
+  }
+  refreshAlertButton();
 
   const buttons = new Map();
   for (const tab of tabs) {
@@ -184,6 +221,7 @@ function createShell(backend, viewer) {
       ]),
       navHost,
       el('div', { class: 'topbar-user' }, [
+        alertButton,
         el('span', { class: 'user-name', text: viewer.label }),
         badge(isAdmin ? Strings.roleAdmin : Strings.roleViewer, isAdmin ? 'admin' : 'ok'),
         el('button', {
@@ -218,6 +256,14 @@ function createShell(backend, viewer) {
 
   function update(next) {
     state = next;
+
+    alertCenter.process({
+      vehicles: visibleVehiclesFor(state.vehicles, state.groups, state.viewer),
+      groups: state.groups,
+      geofences: state.geofences,
+      nowMs: state.nowMs,
+    });
+
     // Yalnızca açık sekme güncellenir; gizli sayfalar sekmeye dönülünce
     // tazelenir, böylece her tikte beş ekran birden kurulmaz.
     const tab = tabs.find((item) => item.id === activeId);

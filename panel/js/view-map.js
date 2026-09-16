@@ -16,26 +16,27 @@ import {
   visibleVehiclesFor,
 } from './visibility-rules.js';
 import { MapView } from './map-view.js';
-import { clear, el, emptyState, statusDot } from './ui.js';
+import { clear, confirmDialog, el, emptyState, runAction, statusDot, toast } from './ui.js';
 import { fleetSummaryOf, statusColor, statusLabel, vehicleStatusOf } from './vehicle-status.js';
 import { formatSpeed, relativeTime } from './time-format.js';
-import {
-  confirmDeleteVehicle,
-  openGroupPicker,
-  openHistory,
-  toggleApproved,
-} from './vehicle-actions.js';
+import { formatDistance } from './geo.js';
+import { confirmDeleteVehicle, openGroupPicker, toggleApproved } from './vehicle-actions.js';
+import { createPlaybackPanel } from './view-playback.js';
+import { openZoneEditor } from './view-zones.js';
 
 export function createMapPage(backend) {
   let state = null;
   let filter = groupFilterAll();
   let selectedId = null;
+  // Açıkken yan sütunu ve haritayı geçmiş rota devralır.
+  let playback = null;
 
   const mapHost = el('div', { class: 'map-canvas' });
   const summaryHost = el('div', { class: 'map-overlay' });
   const filterHost = el('div', { class: 'chip-row' });
   const listHost = el('div', { class: 'vehicle-list' });
   const detailHost = el('div', { class: 'detail-host' });
+  const zoneHost = el('div', { class: 'zone-section' });
 
   // Leaflet haritası sayfa **belgeye eklendikten sonra** kurulur.
   //
@@ -72,26 +73,22 @@ export function createMapPage(backend) {
     },
   }, Strings.mapFollow);
 
-  const clearTrackButton = el('button', {
-    type: 'button',
-    class: 'btn btn-ghost btn-small',
-    onclick: () => {
-      mapView.clearTrack();
-      draw();
-    },
-  }, Strings.historyHideTrack);
+  // Yan sütun iki kip arasında geçer: canlı liste ya da geçmiş rota oynatma.
+  const liveSide = el('div', { class: 'side-live' }, [
+    el('div', { class: 'side-head' }, [
+      el('h2', { class: 'side-title', text: Strings.navMap }),
+      el('div', { class: 'side-actions' }, [fitButton, followButton]),
+    ]),
+    filterHost,
+    listHost,
+    detailHost,
+    zoneHost,
+  ]);
+  const playbackHost = el('div', { class: 'side-playback' });
 
   const node = el('div', { class: 'map-page' }, [
     el('div', { class: 'map-holder' }, [mapHost, summaryHost]),
-    el('aside', { class: 'map-side' }, [
-      el('div', { class: 'side-head' }, [
-        el('h2', { class: 'side-title', text: Strings.navMap }),
-        el('div', { class: 'side-actions' }, [fitButton, followButton, clearTrackButton]),
-      ]),
-      filterHost,
-      listHost,
-      detailHost,
-    ]),
+    el('aside', { class: 'map-side' }, [liveSide, playbackHost]),
   ]);
 
   // Sayfa açıldığında harita (gerekiyorsa) kurulur ve Leaflet ölçüyü yeniden
@@ -113,6 +110,8 @@ export function createMapPage(backend) {
   function draw() {
     // Harita henüz kurulmadıysa sayfa görünür değildir; onShow() çizecek.
     if (state === null || mapView === null) return;
+    // Geçmiş rota açıkken canlı liste ve işaretçiler dondurulur.
+    if (playback !== null) return;
     const { viewer, groups, nowMs } = state;
     const visible = visibleVehicles();
     const shown = visible.filter((vehicle) => filterMatches(filter, vehicle));
@@ -129,11 +128,12 @@ export function createMapPage(backend) {
     drawFilters(visible, viewer);
     drawList(shown, nowMs, viewer, groups);
     drawDetail(shown, nowMs, viewer, groups);
+    mapView.showGeofences(state.geofences);
+    drawZones(viewer);
 
     followButton.textContent = mapView.following ? Strings.mapFollowing : Strings.mapFollow;
     followButton.classList.toggle('btn-active', mapView.following);
     followButton.disabled = selectedId === null;
-    clearTrackButton.hidden = !mapView.hasTrack;
   }
 
   function drawSummary(vehicles, nowMs) {
@@ -290,7 +290,7 @@ export function createMapPage(backend) {
           el('button', {
             type: 'button',
             class: 'btn btn-small btn-ghost',
-            onclick: () => openHistory(backend, vehicle, { mapView }),
+            onclick: () => openPlayback(vehicle),
           }, Strings.viewHistory),
           el('button', {
             type: 'button',
@@ -320,8 +320,115 @@ export function createMapPage(backend) {
     ]);
   }
 
+  // Bölge listesi. İzleyici bölgeleri haritada görür ama düzenleyemez.
+  function drawZones(viewer) {
+    clear(zoneHost);
+    const isAdmin = viewer.role === Role.admin;
+    const zones = state.geofences;
+    if (zones.length === 0 && !isAdmin) return;
+
+    zoneHost.append(
+      el('div', { class: 'zone-row' }, [
+        el('span', { class: 'side-title', text: Strings.zonesTitle }),
+        isAdmin
+          ? el('button', {
+              type: 'button',
+              class: `btn btn-ghost btn-small ${mapView.picking ? 'btn-active' : ''}`,
+              onclick: () => (mapView.picking ? cancelPick() : startPick()),
+            }, mapView.picking ? Strings.zoneAddCancel : Strings.zoneAdd)
+          : null,
+      ]),
+    );
+
+    if (mapView.picking) {
+      zoneHost.append(el('p', { class: 'field-hint', text: Strings.zoneAddHint }));
+    }
+    if (zones.length === 0) {
+      zoneHost.append(el('p', { class: 'field-hint', text: Strings.zonesEmpty }));
+      return;
+    }
+
+    for (const zone of zones) {
+      zoneHost.append(
+        el('div', { class: 'zone-row' }, [
+          el('div', {}, [
+            el('div', { class: 'zone-name', text: zone.name }),
+            el('div', { class: 'zone-meta', text: formatDistance(zone.radiusM) }),
+          ]),
+          isAdmin
+            ? el('div', { class: 'row-actions' }, [
+                el('button', {
+                  type: 'button',
+                  class: 'btn btn-small btn-ghost',
+                  onclick: () => openZoneEditor({ backend, zone }),
+                }, Strings.zoneEdit),
+                el('button', {
+                  type: 'button',
+                  class: 'btn btn-small btn-danger',
+                  onclick: () => removeZone(zone),
+                }, Strings.delete),
+              ])
+            : null,
+        ]),
+      );
+    }
+  }
+
+  function startPick() {
+    mapView.startPicking((lat, lng) => {
+      openZoneEditor({ backend, zone: null, lat, lng });
+      draw();
+    });
+    toast(Strings.zoneAddHint, 'info');
+    draw();
+  }
+
+  function cancelPick() {
+    mapView.stopPicking();
+    draw();
+  }
+
+  async function removeZone(zone) {
+    const confirmed = await confirmDialog({
+      title: Strings.zoneDeleteTitle,
+      message: `${zone.name} — ${Strings.zoneDeleteMessage}`,
+      confirmLabel: Strings.delete,
+      danger: true,
+    });
+    if (!confirmed) return;
+    await runAction(null, () => backend.deleteGeofence(zone.id), Strings.zoneDeleted);
+  }
+
+  // Geçmiş rota kipine geçer. Panel kendi verisini okur ve haritayı devralır.
+  function openPlayback(vehicle) {
+    closePlayback();
+    ensureMap();
+    playback = createPlaybackPanel({
+      backend,
+      mapView,
+      vehicle,
+      onClose: () => {
+        playback = null;
+        clear(playbackHost);
+        liveSide.hidden = false;
+        draw();
+      },
+    });
+    liveSide.hidden = true;
+    clear(playbackHost).append(playback.node);
+  }
+
+  function closePlayback() {
+    if (playback === null) return;
+    playback.destroy();
+    playback = null;
+    clear(playbackHost);
+    liveSide.hidden = false;
+  }
+
   // Araç tablosundan "Haritada göster" ile gelindiğinde kullanılır.
   function focusVehicle(vehicleId) {
+    closePlayback();
     filter = groupFilterAll();
     selectedId = vehicleId;
     ensureMap();
@@ -329,5 +436,5 @@ export function createMapPage(backend) {
     mapView.setSelected(vehicleId, { focus: true });
   }
 
-  return { node, update, onShow, focusVehicle };
+  return { node, update, onShow, focusVehicle, openPlayback };
 }

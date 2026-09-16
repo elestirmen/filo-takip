@@ -169,11 +169,34 @@ void main() {
         visibleGroups: <String>['Kaman'],
         showSpeed: false,
         showDriverName: true,
+        speedLimitKmh: 90,
       );
       expect(
         GroupConfig.fromMap('Merkez', config.toMap()).toMap(),
         config.toMap(),
       );
+    });
+
+    test('speedLimitKmh yoksa sıfıra düşer', () {
+      expect(GroupConfig.fromMap('Merkez', null).speedLimitKmh, 0);
+    });
+
+    test('web panelinin yazdığı hız sınırı uygulamadan geçince kaybolmaz', () {
+      // saveGroupConfig düğümün tamamını set() ile yazar. Uygulama bu alanı
+      // hiç göstermese de okuyup geri yazmazsa, panelde girilen sınır
+      // uygulamadan yapılan ilk grup düzenlemesinde silinirdi.
+      final GroupConfig fromPanel = GroupConfig.fromMap(
+        'Merkez',
+        <String, Object?>{
+          'visibleGroups': <String>['Kaman'],
+          'showSpeed': true,
+          'showDriverName': true,
+          'speedLimitKmh': 70,
+        },
+      );
+      final GroupConfig edited = fromPanel.copyWith(showSpeed: false);
+      expect(edited.speedLimitKmh, 70);
+      expect(edited.toMap()['speedLimitKmh'], 70);
     });
   });
 

@@ -82,6 +82,7 @@ export const Strings = Object.freeze({
   errorGroupConfigsStream: 'Grup ayarları alınamadı.',
   errorUsersStream: 'Kullanıcı listesi alınamadı.',
   errorAdminStream: 'Yönetici yetkisi okunamadı.',
+  errorGeofencesStream: 'Bölgeler alınamadı.',
   errorStartupTitle: 'Panel başlatılamadı',
   errorFirebaseInit:
     'Firebase bağlantısı kurulamadı. js/config.js içindeki değerleri kontrol edin.',
@@ -126,8 +127,9 @@ export const Strings = Object.freeze({
   mapFieldCoords: 'Koordinat',
   mapGroupNone: 'Atanmamış',
   mapNoLocationYet: 'Bu aracın henüz konumu yok.',
-  mapAttribution: 'OpenStreetMap katkıcıları',
   mapFitAll: 'Tümünü sığdır',
+  mapLayerStreet: 'Sokak',
+  mapLayerSatellite: 'Uydu',
   mapFollow: 'Takip et',
   mapFollowing: 'Takip ediliyor',
   mapHiddenNoLocation: 'konumu olmayan araç haritada gösterilmiyor',
@@ -242,6 +244,98 @@ export const Strings = Object.freeze({
     'Hesap yönetici listesinden çıkarılacak ve izleyici yetkisine düşecek.',
   selfRoleLocked: 'Kendi yetkinizi bu ekrandan değiştiremezsiniz.',
   youBadge: 'Siz',
+
+  // ------------------------------------------------------------- Uyarılar
+  alertsTitle: 'Uyarılar',
+  alertsOpen: 'Uyarılar',
+  alertsEmpty: 'Henüz uyarı yok',
+  alertsEmptyHint:
+    'Hız aşımı, çevrimdışına düşme ve bölge giriş/çıkışları burada listelenir. '
+    + 'Uyarılar yalnızca panel açıkken üretilir.',
+  alertsClear: 'Listeyi temizle',
+  alertsNotifications: 'Tarayıcı bildirimleri',
+  alertsNotificationsHint:
+    'Panel arka plandayken de bildirim gösterir. Tarayıcı izin ister.',
+  alertsNotificationsBlocked:
+    'Bildirim izni tarayıcıda reddedilmiş. Site ayarlarından açabilirsiniz.',
+  alertSpeeding: 'Hız aşımı',
+  alertOffline: 'Çevrimdışı oldu',
+  alertZoneEnter: 'Bölgeye girdi',
+  alertZoneExit: 'Bölgeden çıktı',
+
+  // -------------------------------------------------------------- Bölgeler
+  zonesTitle: 'Bölgeler',
+  zonesHint:
+    'Araç bir bölgeye girdiğinde ya da çıktığında uyarı üretilir. Bölge, '
+    + 'merkez ve yarıçapla tanımlanan bir dairedir.',
+  zonesEmpty: 'Tanımlı bölge yok',
+  zoneAdd: 'Bölge ekle',
+  zoneAddHint: 'Haritada bölgenin merkezi olacak noktaya tıklayın.',
+  zoneAddCancel: 'Vazgeç',
+  zoneNameLabel: 'Bölge adı',
+  zoneNameHint: 'Merkez Depo',
+  zoneNameRequired: 'Bölge adı girin.',
+  zoneRadiusLabel: 'Yarıçap (metre)',
+  zoneRadiusInvalid: 'Yarıçap 50 ile 50000 metre arasında olmalı.',
+  zoneSaved: 'Bölge kaydedildi.',
+  zoneDeleted: 'Bölge silindi.',
+  zoneDeleteTitle: 'Bölge silinsin mi?',
+  zoneDeleteMessage: 'Bu bölge için uyarı üretilmeyecek.',
+  zoneEdit: 'Bölgeyi düzenle',
+  speedLimitLabel: 'Hız sınırı (km/s)',
+  speedLimitHelp:
+    'Bu gruptaki araç sınırı aştığında uyarı üretilir. 0 yazarsanız sınır '
+    + 'uygulanmaz.',
+  speedLimitNone: 'Sınır yok',
+  speedLimitInvalid: 'Hız sınırı 0 ile 300 arasında olmalı.',
+
+  // ------------------------------------------------------------ Raporlar
+  navReports: 'Raporlar',
+  reportsTitle: 'Filo raporu',
+  reportsHint:
+    'Her aracın konum geçmişinden hesaplanır. Rapor, kayıtların kapsadığı '
+    + 'süreyi kapsar; daha eskisi veritabanında tutulmaz.',
+  reportsBuild: 'Raporu oluştur',
+  reportsBuilding: 'Hesaplanıyor…',
+  reportsRefresh: 'Yeniden hesapla',
+  reportsExport: 'CSV indir',
+  reportsEmpty: 'Rapor için araç yok',
+  reportsNotBuilt: 'Rapor henüz oluşturulmadı',
+  reportsNotBuiltHint:
+    'Her araç için konum geçmişi ayrı okunur, bu yüzden rapor kendiliğinden '
+    + 'değil istendiğinde hesaplanır.',
+  reportsTotals: 'Toplam',
+  reportsNoData: 'kayıt yok',
+  reportsFailed: 'Rapor oluşturulamadı.',
+  reportsFileName: 'filo-raporu',
+
+  // ------------------------------------------------------- Geçmiş rota
+  playbackTitle: 'Geçmiş rota',
+  playbackLoading: 'Geçmiş yükleniyor…',
+  playbackEmpty: 'Bu araç için konum kaydı yok.',
+  playbackNoRoute: 'Kayıtlar tek noktada; çizilecek rota yok.',
+  playbackPlay: 'Oynat',
+  playbackPause: 'Duraklat',
+  playbackReplay: 'Baştan',
+  playbackSpeedLabel: 'Hız',
+  playbackSpeedSlow: 'Yavaş',
+  playbackSpeedNormal: 'Normal',
+  playbackSpeedFast: 'Hızlı',
+  playbackBackToLive: 'Canlıya dön',
+  playbackShowRecords: 'Kayıtları göster',
+  playbackFollow: 'Haritada takip et',
+  stopLabel: 'Durak',
+
+  reportDistance: 'Katedilen yol',
+  reportMoving: 'Hareket süresi',
+  reportStopped: 'Duruş süresi',
+  reportMaxSpeed: 'En yüksek hız',
+  reportAvgSpeed: 'Ortalama hız',
+  reportStops: 'Durak sayısı',
+  reportRange: 'Kapsanan aralık',
+  reportWindowNote:
+    'Uygulama araç başına en fazla 500 konum kaydı tutar (45 saniyede bir), '
+    + 'yani geçmiş yaklaşık son 6 saati kapsar. Daha eskisi otomatik silinir.',
 
   // ------------------------------------------------------- Konum geçmişi
   historyTitle: 'Konum geçmişi',

@@ -33,6 +33,59 @@ Uygulamadaki `lib/core/visibility_rules.dart` ile aynı mantıktır: kendi grubu
 > [database.rules.json](../database.rules.json) dosyasıdır; aşağıdaki
 > "Güvenlik notu" bölümüne bakın.
 
+## Harita
+
+Sağ üstteki seçiciden iki katman arasında geçilir; seçim tarayıcıda hatırlanır.
+
+| Katman | Kaynak | Not |
+| --- | --- | --- |
+| Sokak | OpenStreetMap | Uygulamadaki harita ile aynı karolar |
+| Uydu | Esri World Imagery | Üstüne yer adı etiketleri bindirilir, yoksa okunmaz |
+
+İkisi de anahtarsız ve ücretsizdir ama **atıf göstermek koşuluyla**; katman
+tanımlarındaki `attribution` alanları boş bırakılmamalıdır
+(`js/config.js` -> `mapLayers`).
+
+Araçlar durum renginde damla biçimli iğnelerle, içlerinde araç silueti ve
+yanlarında plaka etiketiyle gösterilir. Seçili araç büyür ve öne alınır.
+
+## Filo takip özellikleri
+
+| Özellik | Nerede | Not |
+| --- | --- | --- |
+| Canlı harita | Harita | Sokak/uydu katmanı, durum renkli araç iğneleri, grup filtresi |
+| Geçmiş rota oynatma | Harita → bir araç → Konum geçmişi | Rota çizilir, zaman çubuğuyla oynatılır, duraklar işaretlenir |
+| Yol/durak raporu | Oynatma paneli ve Raporlar | Katedilen yol, hareket/duruş süresi, durak sayısı, ortalama hız |
+| Filo raporu + CSV | Raporlar | Tüm araçlar tek tabloda; Excel için noktalı virgüllü CSV |
+| Hız aşımı uyarısı | Gruplar → hız sınırı | Sınırı aşan araç uyarı üretir; 0 ise sınır yok |
+| Çevrimdışı uyarısı | kendiliğinden | Araç 5 dakika güncellenmezse bir kez uyarır |
+| Bölge (geofence) uyarısı | Harita → Bölgeler | Daire biçimli bölgeye giriş/çıkışta uyarı |
+
+### Uyarıların sınırı
+
+Uyarılar **yalnızca panel açıkken** üretilir. Sunucu tarafında bir izleyici
+yoktur; sekme kapalıyken olan bir hız aşımı fark edilmez. Bunun için bir
+Cloud Function ya da benzeri bir sunucu bileşeni gerekir.
+
+Uyarı **geçiş anında** bir kez üretilir, durum sürdüğü sürece değil: sınırı
+aşan araç aştığı anda uyarır, altına inip tekrar aşarsa yeniden uyarır. Aksi
+hâlde panel saniyede bir aynı uyarıyı yağdırırdı.
+
+Liste kalıcı değildir, sayfa yenilenince sıfırlanır. Tarayıcı bildirimleri
+isteğe bağlıdır ve izin yalnızca kullanıcı açtığında istenir.
+
+### Rapor hesabının eşikleri
+
+Gerçek GPS verisi gürültülüdür; `js/trip-report.js` üç eşikle ayıklar:
+
+* 8 metrenin altındaki adımlar titreme sayılır, yola eklenmez,
+* 250 km/s üstü adımlar veri hatası sayılır, elenir,
+* 3 dakikadan uzun duruşlar durak olur.
+
+Bir aralığın hareket mi duruş mu olduğuna **katedilen mesafe** karar verir,
+anlık hız alanı değil. Uç noktaların hızına bakmak, hareketten duruşa geçen
+aralıkta molayı hareket süresine yazıp ortalama hızı bozuyordu.
+
 ## Demo kipi
 
 `js/config.js` içindeki Firebase yapılandırması boş olduğu sürece panel demo

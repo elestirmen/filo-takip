@@ -67,6 +67,10 @@ export function createGroupsPage(backend) {
             ),
             row(Strings.showSpeed, group.showSpeed ? Strings.visible : Strings.hidden),
             row(Strings.showDriverName, group.showDriverName ? Strings.visible : Strings.hidden),
+            row(
+              Strings.speedLimitLabel,
+              group.speedLimitKmh > 0 ? String(group.speedLimitKmh) : Strings.speedLimitNone,
+            ),
           ]),
           el('div', { class: 'detail-actions' }, [
             el('button', {
@@ -98,6 +102,10 @@ export function createGroupsPage(backend) {
     const nameInput = textInput({ value: isNew ? '' : group.groupId, placeholder: Strings.groupNameHint });
     const error = el('p', { class: 'form-error', role: 'alert' });
 
+    const speedLimit = textInput({
+      type: 'number',
+      value: isNew ? '0' : String(group.speedLimitKmh),
+    });
     const speed = checkbox(Strings.showSpeed, isNew ? true : group.showSpeed);
     const driver = checkbox(Strings.showDriverName, isNew ? true : group.showDriverName);
 
@@ -124,6 +132,7 @@ export function createGroupsPage(backend) {
         el('div', { class: 'checkbox-list' }, [speed.node, driver.node]),
         el('span', { class: 'field-hint', text: Strings.fieldVisibilityHelp }),
       ]),
+      field(Strings.speedLimitLabel, speedLimit, Strings.speedLimitHelp),
       error,
     ]);
 
@@ -149,6 +158,12 @@ export function createGroupsPage(backend) {
               }
             }
 
+            const limit = Number(speedLimit.value);
+            if (!Number.isFinite(limit) || limit < 0 || limit > 300) {
+              error.textContent = Strings.speedLimitInvalid;
+              return;
+            }
+
             const config = new GroupConfig({
               groupId,
               visibleGroups: visibleBoxes
@@ -156,6 +171,7 @@ export function createGroupsPage(backend) {
                 .map((item) => item.groupId),
               showSpeed: speed.input.checked,
               showDriverName: driver.input.checked,
+              speedLimitKmh: Math.round(limit),
             });
 
             const ok = await runAction(

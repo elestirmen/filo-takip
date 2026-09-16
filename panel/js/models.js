@@ -69,11 +69,13 @@ export class Vehicle {
 
 // `/groupConfigs/{groupId}` düğümü. Yalnızca yönetici yazar.
 export class GroupConfig {
-  constructor({ groupId, visibleGroups, showSpeed, showDriverName }) {
+  constructor({ groupId, visibleGroups, showSpeed, showDriverName, speedLimitKmh = 0 }) {
     this.groupId = groupId;
     this.visibleGroups = Object.freeze([...visibleGroups]);
     this.showSpeed = showSpeed;
     this.showDriverName = showDriverName;
+    // 0 ise sınır yok. Bu gruptaki araç sınırı aştığında uyarı üretilir.
+    this.speedLimitKmh = speedLimitKmh;
     Object.freeze(this);
   }
 
@@ -86,6 +88,7 @@ export class GroupConfig {
       // Alan yazılmamışsa gizleme yok: yeni grup her şeyi gösterir.
       showSpeed: dbBool(map.showSpeed, true),
       showDriverName: dbBool(map.showDriverName, true),
+      speedLimitKmh: dbDouble(map.speedLimitKmh),
     });
   }
 
@@ -95,6 +98,7 @@ export class GroupConfig {
       visibleGroups: changes.visibleGroups ?? this.visibleGroups,
       showSpeed: changes.showSpeed ?? this.showSpeed,
       showDriverName: changes.showDriverName ?? this.showDriverName,
+      speedLimitKmh: changes.speedLimitKmh ?? this.speedLimitKmh,
     });
   }
 
@@ -104,6 +108,7 @@ export class GroupConfig {
       visibleGroups: [...this.visibleGroups],
       showSpeed: this.showSpeed,
       showDriverName: this.showDriverName,
+      speedLimitKmh: this.speedLimitKmh,
     };
   }
 }
@@ -128,6 +133,46 @@ export class LocationSample {
       speedKmh: dbDouble(map.speedKmh),
       recordedAt: dbInt(map.recordedAt),
     });
+  }
+}
+
+// `/geofences/{id}` düğümü — harita üzerinde tanımlı dairesel bölge.
+//
+// Poligon yerine daire: merkez ve yarıçap iki sayıdır, çizim aracı
+// gerektirmez ve depo/müşteri sahası/şehir sınırı gibi gerçek ihtiyaçların
+// çoğunu karşılar.
+export class Geofence {
+  constructor({ id, name, lat, lng, radiusM, createdAt }) {
+    this.id = id;
+    this.name = name;
+    this.lat = lat;
+    this.lng = lng;
+    this.radiusM = radiusM;
+    this.createdAt = createdAt;
+    Object.freeze(this);
+  }
+
+  static fromMap(id, raw) {
+    const map = dbMap(raw);
+    return new Geofence({
+      id,
+      name: dbString(map.name, id),
+      lat: dbDouble(map.lat),
+      lng: dbDouble(map.lng),
+      // Yarıçapsız bir bölge hiçbir aracı içermez; makul bir tabana düşülür.
+      radiusM: dbDouble(map.radiusM, 500),
+      createdAt: dbInt(map.createdAt),
+    });
+  }
+
+  toMap() {
+    return {
+      name: this.name,
+      lat: this.lat,
+      lng: this.lng,
+      radiusM: this.radiusM,
+      createdAt: this.createdAt,
+    };
   }
 }
 

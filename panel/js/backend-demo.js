@@ -9,7 +9,7 @@
 
 import { BackendError } from './backend-error.js';
 import { EventChannel, LatestValue } from './emitter.js';
-import { GroupConfig, LocationSample, Vehicle, Viewer, WebUser } from './models.js';
+import { Geofence, GroupConfig, LocationSample, Vehicle, Viewer, WebUser } from './models.js';
 import { compareText } from './admin-rules.js';
 import { mapDefaults } from './config.js';
 import { Strings } from './strings.js';
@@ -69,6 +69,7 @@ export class DemoBackend {
     this._history = new Map();
     this._motions = new Map();
     this._users = new Map();
+    this._geofences = new Map();
     this._admins = new Set();
     this._passwords = new Map();
 
@@ -79,6 +80,7 @@ export class DemoBackend {
     this.vehicles = new LatestValue([]);
     this.groups = new LatestValue([]);
     this.users = new LatestValue([]);
+    this.geofences = new LatestValue([]);
     this.adminUids = new LatestValue(new Set());
     this.viewer = new LatestValue(null);
     this.errors = new EventChannel();
@@ -86,6 +88,7 @@ export class DemoBackend {
     this._seedGroups();
     this._seedVehicles();
     this._seedUsers();
+    this._seedGeofences();
     this._restoreSession();
     this._publish();
 
@@ -215,6 +218,20 @@ export class DemoBackend {
     this._publish();
   }
 
+  async saveGeofence(geofence) {
+    await this._delay();
+    this._requireAdmin();
+    this._geofences.set(geofence.id, geofence);
+    this._publish();
+  }
+
+  async deleteGeofence(id) {
+    await this._delay();
+    this._requireAdmin();
+    this._geofences.delete(id);
+    this._publish();
+  }
+
   async setUserApproved(uid, approved) {
     await this._delay();
     this._requireAdmin();
@@ -317,9 +334,11 @@ export class DemoBackend {
       compareText(a.groupId, b.groupId),
     );
     const userList = [...this._users.values()];
+    const zoneList = [...this._geofences.values()].sort((a, b) => compareText(a.name, b.name));
     this.vehicles.add(vehicleList);
     this.groups.add(groupList);
     this.users.add(userList);
+    this.geofences.add(zoneList);
     this.adminUids.add(new Set(this._admins));
     this._publishViewer();
   }
@@ -360,6 +379,8 @@ export class DemoBackend {
         visibleGroups: ['Kaman'],
         showSpeed: true,
         showDriverName: true,
+        // Merkez araçları 50 km/s üstünde uyarı üretir.
+        speedLimitKmh: 50,
       }),
     );
     this._groups.set(
@@ -371,6 +392,27 @@ export class DemoBackend {
         showDriverName: true,
       }),
     );
+  }
+
+  // Demo bölgeleri: biri araçların dolaştığı merkezde (giriş/çıkış uyarısı
+  // kendiliğinden tetiklenir), biri kenarda.
+  _seedGeofences() {
+    this._geofences.set('merkez-depo', new Geofence({
+      id: 'merkez-depo',
+      name: 'Merkez Depo',
+      lat: CENTER_LAT,
+      lng: CENTER_LNG,
+      radiusM: 2500,
+      createdAt: this.nowMs() - 86400000,
+    }));
+    this._geofences.set('kuzey-saha', new Geofence({
+      id: 'kuzey-saha',
+      name: 'Kuzey Saha',
+      lat: CENTER_LAT + 0.022,
+      lng: CENTER_LNG + 0.02,
+      radiusM: 1800,
+      createdAt: this.nowMs() - 86400000,
+    }));
   }
 
   _seedUsers() {
@@ -514,22 +556,60 @@ export class DemoBackend {
       frozen: ageMs > 0,
     });
 
-    // Konum geçmişi ekranı boş kalmasın diye geçmişe doğru 120 kayıt üret;
-    // aralık gerçek yazma aralığıyla aynı.
+    this._history.set(id, this._seedHistory({ lat, lng, speedKmh, now, ageMs }));
+  }
+
+  // Aracın geçmiş rotasını şimdiden geriye doğru üretir.
+  //
+  // Önceki sürüm noktaları birbirine ~1 metre uzaklıkta koyuyordu; bu, gerçek
+  // GPS titremesinin altında kaldığı için rapor "0 km yol, hep duruş"
+  // çıkarıyordu. Artık adım uzunluğu gerçek hızdan hesaplanır (45 saniyede
+  // 40 km/s ≈ 500 m) ve yön rastgele sapar, yani rota gerçek bir güzergâh
+  // gibi görünür. Ortaya bir de duruş konur ki durak tespiti denenebilsin.
+  _seedHistory({ lat, lng, speedKmh, now, ageMs }) {
+    const count = 120;
+    // Duran araç geçmişte de durur; yalnızca hareketli olanlara rota üretilir.
+    const stopFrom = speedKmh > 0 ? 46 : -1;
+    const stopTo = speedKmh > 0 ? 60 : -1;
+
+    let heading = this._random() * 2 * Math.PI;
+    let currentLat = lat;
+    let currentLng = lng;
     const samples = [];
-    for (let i = 120; i > 0; i--) {
+
+    // i = 1 en yeni kayıttan bir önceki; geriye doğru yürünür.
+    for (let i = 1; i <= count; i++) {
+      // Duran aracın geçmişi de durgundur; alt sınır yalnızca hareketli
+      // araçlara uygulanır, yoksa hızı sıfır olan araç da yol yapmış görünür.
+      const stopped = speedKmh === 0 || (i >= stopFrom && i <= stopTo);
+      const stepSpeed = stopped ? 0 : Math.max(5, speedKmh + this._random() * 14 - 7);
+
       samples.push(
         new LocationSample({
           id: this._nextPushId(),
-          lat: lat - (dLat * i) / 400,
-          lng: lng - (dLng * i) / 400,
-          speedKmh: speedKmh === 0 ? 0 : Math.max(0, speedKmh + this._random() * 15 - 7),
-          recordedAt: now - ageMs - i * HISTORY_INTERVAL_MS,
+          lat: currentLat,
+          lng: currentLng,
+          speedKmh: stepSpeed,
+          recordedAt: now - ageMs - (i - 1) * HISTORY_INTERVAL_MS,
         }),
       );
+
+      if (stopped) continue;
+      heading += (this._random() - 0.5) * 0.8;
+      const metres = ((stepSpeed * 1000) / 3600) * (HISTORY_INTERVAL_MS / 1000);
+      // Geriye doğru gidildiği için işaret ters.
+      currentLat -= (metres * Math.cos(heading)) / 111320;
+      currentLng -= (metres * Math.sin(heading)) / (111320 * Math.cos((currentLat * Math.PI) / 180));
+      // Merkezden fazla uzaklaşırsa geri döndür; rota bölgede kalsın.
+      if (Math.abs(currentLat - CENTER_LAT) > 0.06 || Math.abs(currentLng - CENTER_LNG) > 0.06) {
+        heading += Math.PI;
+      }
     }
+
+    // En eski kayıt başta.
+    samples.reverse();
     while (samples.length > HISTORY_MAX_RECORDS) samples.shift();
-    this._history.set(id, samples);
+    return samples;
   }
 
   _moveVehicles() {
