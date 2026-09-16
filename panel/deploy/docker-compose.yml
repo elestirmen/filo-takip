@@ -1,0 +1,39 @@
+# Filo Takip yönetim paneli — statik yayın konteyneri.
+#
+# Sunucudaki desen: her site nginx:alpine ile npm-net ağında durur, dışarıya
+# port açmaz; 80/443'ü Nginx Proxy Manager karşılar ve isme göre yönlendirir.
+#
+#   docker compose -f /opt/filo-takip/panel/deploy/docker-compose.yml up -d
+#
+# NPM tarafında proxy host: filo-takip.perinet.org -> filo-takip-web:80
+#
+# Panel derlenmez: js/ ve css/ altındaki dosyalar konteynere salt-okunur
+# bağlanır, düzenleyip tarayıcıyı yenilemek yeter.
+#
+# nginx.conf değişirse `up -d --force-recreate` gerekir: tek dosya bind-mount
+# inode'a bağlıdır, yeniden başlatmak ya da reload etmek eski içeriği bırakır.
+
+name: filo-takip
+
+services:
+  panel:
+    image: nginx:alpine
+    container_name: filo-takip-web
+    restart: unless-stopped
+    expose:
+      - "80"
+    volumes:
+      - /opt/filo-takip/panel:/usr/share/nginx/html:ro
+      - /opt/filo-takip/panel/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - npm-net
+
+networks:
+  npm-net:
+    external: true

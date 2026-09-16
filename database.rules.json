@@ -22,9 +22,24 @@
         ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists())"
       }
     },
+    "webUsers": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read":  "auth != null && auth.uid == $uid",
+        ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+        "email":       { ".write": "auth != null && auth.uid == $uid", ".validate": "newData.isString()" },
+        "displayName": { ".write": "auth != null && auth.uid == $uid", ".validate": "newData.isString()" },
+        "createdAt":   { ".write": "auth != null && auth.uid == $uid", ".validate": "newData.isNumber()" },
+        "approved":    { ".validate": "newData.isBoolean()" },
+        "groupId":     { ".validate": "newData.isString()" }
+      }
+    },
     "admins": {
       ".read": "auth != null",
-      ".write": false
+      "$uid": {
+        ".write": "auth != null && root.child('admins').child(auth.uid).exists() && ($uid != auth.uid || newData.exists())",
+        ".validate": "newData.isBoolean()"
+      }
     }
   }
 }

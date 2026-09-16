@@ -49,3 +49,7 @@ app.*.map.json
 
 # Yerelde uretilen APK dosyalari
 *.apk
+
+# Panel görünüm testleri için isteğe bağlı kurulan jsdom (npm install --no-save jsdom)
+panel/node_modules/
+panel/package-lock.json
