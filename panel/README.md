@@ -54,6 +54,10 @@ Demo hesapları — üç rolü de denemek için:
 grupsuz araçlar görünmez; Kaman araçlarının sürücü adı "Gizli" yazar. Aynı
 filoya yönetici hesabıyla bakınca hepsi görünür.
 
+Açık oturum sayfa yenilendiğinde kaybolmaz: demo kipinde açık hesabın uid'i
+`localStorage`'da tutulur (şifre değil), gerçek kipte bunu Firebase Auth
+kendisi yapar. Filo verisi ise her yenilemede sıfırlanır — o bellekte durur.
+
 ## Gerçek Firebase'e geçiş
 
 1. [KURULUM.md](../KURULUM.md) adımlarını bitirin (proje, Realtime Database,

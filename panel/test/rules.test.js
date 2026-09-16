@@ -16,10 +16,21 @@ import test from 'node:test';
 // Araçları hareket ettiren aralık unref edilir, yoksa test bitmez. Yazma
 // çağrılarındaki kısa bekleme unref EDİLMEZ: beklenen bir söz olduğu için
 // olay döngüsünü açık tutması gerekir.
+//
+// Açık oturum localStorage'da tutulduğu için onun da bellek içi bir karşılığı
+// gerekiyor. Depolama freshBackend() içinde temizlenir; yoksa bir testte
+// açılan oturum bir sonrakine sızar.
+const storage = new Map();
+
 globalThis.window = {
   setInterval: (fn, ms) => setInterval(fn, ms).unref(),
   clearInterval: (handle) => clearInterval(handle),
   setTimeout: (fn, ms) => setTimeout(fn, ms),
+  localStorage: {
+    getItem: (key) => (storage.has(key) ? storage.get(key) : null),
+    setItem: (key, value) => storage.set(key, String(value)),
+    removeItem: (key) => storage.delete(key),
+  },
 };
 
 const { DemoBackend } = await import('../js/backend-demo.js');
@@ -32,6 +43,12 @@ const { sortVehiclesForAdmin, isGroupNameAvailable, matchesVehicleSearch } =
   await import('../js/admin-rules.js');
 const { normalizeGroupName, normalizeDriverName, isValidEmail, turkishUpperCase } =
   await import('../js/normalize.js');
+
+function freshBackend() {
+  // Kalıcı oturum testler arasında sızmasın.
+  storage.clear();
+  return new DemoBackend();
+}
 
 function viewerFor(backend, email) {
   const user = backend.users.value.find((item) => item.email === email);
@@ -52,7 +69,7 @@ async function signedInAdmin(backend) {
 // ------------------------------------------------------------ Demo veri
 
 test('demo arka uç uygulamadaki filoyla aynı tohumla açılır', () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   assert.equal(backend.vehicles.value.length, 6);
   assert.deepEqual(
     backend.groups.value.map((group) => group.groupId),
@@ -64,7 +81,7 @@ test('demo arka uç uygulamadaki filoyla aynı tohumla açılır', () => {
 });
 
 test('araç durumları uygulamadaki eşiklerle aynı çıkar', () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   const now = backend.nowMs();
   const byPlate = (plate) => backend.vehicles.value.find((v) => v.plate === plate);
 
@@ -85,7 +102,7 @@ test('araç durumları uygulamadaki eşiklerle aynı çıkar', () => {
 // ------------------------------------------------------ Görünürlük kuralı
 
 test('yönetici tüm araçları görür', () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   const viewer = viewerFor(backend, 'yonetici@ornek.com');
   assert.equal(viewer.role, Role.admin);
   assert.equal(
@@ -96,7 +113,7 @@ test('yönetici tüm araçları görür', () => {
 });
 
 test('izleyici kendi grubunu ve grubunun görebildiği grupları görür', () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   const viewer = viewerFor(backend, 'izleyici@ornek.com');
   assert.equal(viewer.role, Role.viewer);
   assert.equal(viewer.groupId, 'Merkez');
@@ -119,7 +136,7 @@ test('izleyici kendi grubunu ve grubunun görebildiği grupları görür', () =>
 });
 
 test('onay bekleyen hesap hiçbir araç görmez', () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   const viewer = viewerFor(backend, 'bekleyen@ornek.com');
   assert.equal(viewer.role, Role.pending);
   assert.equal(
@@ -130,7 +147,7 @@ test('onay bekleyen hesap hiçbir araç görmez', () => {
 });
 
 test('onaylı ama grupsuz izleyici de araç görmez', () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   const viewer = new Viewer({
     uid: 'x',
     email: 'x@ornek.com',
@@ -153,7 +170,7 @@ test('onaylı ama grupsuz izleyici de araç görmez', () => {
 });
 
 test('alan gizleme bakılan aracın grubuna göre yapılır', () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   const groups = backend.groups.value;
   const viewer = viewerFor(backend, 'izleyici@ornek.com');
   const admin = viewerFor(backend, 'yonetici@ornek.com');
@@ -181,7 +198,7 @@ test('alan gizleme bakılan aracın grubuna göre yapılır', () => {
 // ------------------------------------------------------- Yönetici işlemleri
 
 test('onaylanan ve gruba atanan araç izleyicinin haritasına girer', async () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   await signedInAdmin(backend);
 
   const pending = backend.vehicles.value.find((vehicle) => !vehicle.approved);
@@ -200,7 +217,7 @@ test('onaylanan ve gruba atanan araç izleyicinin haritasına girer', async () =
 });
 
 test('grup silinince araçların ve izleyicilerin ataması temizlenir', async () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   await signedInAdmin(backend);
 
   await backend.deleteGroup('Merkez');
@@ -215,7 +232,7 @@ test('grup silinince araçların ve izleyicilerin ataması temizlenir', async ()
 });
 
 test('araç silinince konum geçmişi de gider', async () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   await signedInAdmin(backend);
   const vehicle = backend.vehicles.value[0];
 
@@ -227,7 +244,7 @@ test('araç silinince konum geçmişi de gider', async () => {
 });
 
 test('konum geçmişi en yeni kayıt üstte gelir', async () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   const samples = await backend.loadHistory(backend.vehicles.value[0].id);
   for (let i = 1; i < samples.length; i++) {
     assert.ok(samples[i - 1].recordedAt >= samples[i].recordedAt);
@@ -236,7 +253,7 @@ test('konum geçmişi en yeni kayıt üstte gelir', async () => {
 });
 
 test('izleyici yazma çağrılarında yetki hatası alır', async () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   await backend.signIn('izleyici@ornek.com', '123456');
   await assert.rejects(
     () => backend.setVehicleApproved(backend.vehicles.value[0].id, true),
@@ -246,14 +263,14 @@ test('izleyici yazma çağrılarında yetki hatası alır', async () => {
 });
 
 test('yönetici kendi yetkisini düşüremez', async () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   const admin = await signedInAdmin(backend);
   await assert.rejects(() => backend.setUserAdmin(admin.uid, false), /kendi yetkinizi/i);
   backend.dispose();
 });
 
 test('yeni kayıt onaysız doğar ve yönetici onayıyla izleyici olur', async () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   await backend.register({
     email: 'yeni@ornek.com',
     password: '123456',
@@ -272,8 +289,28 @@ test('yeni kayıt onaysız doğar ve yönetici onayıyla izleyici olur', async (
   backend.dispose();
 });
 
+test('oturum sayfa yenilenince açık kalır', async () => {
+  const backend = freshBackend();
+  await backend.signIn('izleyici@ornek.com', '123456');
+  assert.equal(backend.viewer.value.email, 'izleyici@ornek.com');
+  backend.dispose();
+
+  // Yenileme: aynı depolamayla yeni bir arka uç kurulur (storage temizlenmez).
+  const reloaded = new DemoBackend();
+  assert.ok(reloaded.viewer.value, 'oturum geri yüklenmedi, giriş ekranına düşer');
+  assert.equal(reloaded.viewer.value.email, 'izleyici@ornek.com');
+  assert.equal(reloaded.viewer.value.role, Role.viewer);
+
+  // Çıkış yapılınca yenilemede de kapalı kalmalı.
+  await reloaded.signOut();
+  reloaded.dispose();
+  const afterSignOut = new DemoBackend();
+  assert.equal(afterSignOut.viewer.value, null);
+  afterSignOut.dispose();
+});
+
 test('hatalı şifre girişi reddedilir', async () => {
-  const backend = new DemoBackend();
+  const backend = freshBackend();
   await assert.rejects(() => backend.signIn('yonetici@ornek.com', 'yanlis'), /hatalı/i);
   assert.equal(backend.viewer.value, null);
   backend.dispose();

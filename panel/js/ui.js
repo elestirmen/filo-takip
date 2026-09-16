@@ -165,15 +165,27 @@ export function statusDot(color, text) {
 
 // Etiketli form alanı.
 export function field(labelText, control, hint) {
-  return el('label', { class: 'field' }, [
+  // Etiket denetimi zaten sarıyor; id varsa ayrıca `for` ile de bağlanır,
+  // çünkü parola yöneticileri açık bağı arıyor.
+  return el('label', { class: 'field', for: control.id || null }, [
     el('span', { class: 'field-label', text: labelText }),
     control,
     hint ? el('span', { class: 'field-hint', text: hint }) : null,
   ]);
 }
 
-export function textInput({ type = 'text', value = '', placeholder = '', autocomplete }) {
-  return el('input', { class: 'input', type, value, placeholder, autocomplete });
+// name ve id isteğe bağlıdır ama giriş formunda **gereklidir**: tarayıcının
+// parola yöneticisi alanları bunlarla tanır. Yalnızca autocomplete vermek
+// yetmiyor, "şifreyi kaydet" önerisi hiç çıkmıyor.
+export function textInput({
+  type = 'text',
+  value = '',
+  placeholder = '',
+  autocomplete,
+  name,
+  id,
+}) {
+  return el('input', { class: 'input', type, value, placeholder, autocomplete, name, id });
 }
 
 // Açılır liste. options: [{value, label}] — value null ise boş dize taşınır.

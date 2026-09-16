@@ -38,8 +38,18 @@ export function renderAuthScreen(backend) {
     el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, label);
 
   const loginCard = () => {
-    const email = textInput({ type: 'email', autocomplete: 'username' });
-    const password = textInput({ type: 'password', autocomplete: 'current-password' });
+    const email = textInput({
+      type: 'email',
+      autocomplete: 'username',
+      name: 'username',
+      id: 'giris-eposta',
+    });
+    const password = textInput({
+      type: 'password',
+      autocomplete: 'current-password',
+      name: 'password',
+      id: 'giris-sifre',
+    });
     const error = errorLine();
     const button = submitButton(Strings.loginButton);
 
@@ -86,9 +96,19 @@ export function renderAuthScreen(backend) {
   };
 
   const registerCard = () => {
-    const name = textInput({ autocomplete: 'name' });
-    const email = textInput({ type: 'email', autocomplete: 'username' });
-    const password = textInput({ type: 'password', autocomplete: 'new-password' });
+    const name = textInput({ autocomplete: 'name', name: 'name', id: 'kayit-ad' });
+    const email = textInput({
+      type: 'email',
+      autocomplete: 'username',
+      name: 'username',
+      id: 'kayit-eposta',
+    });
+    const password = textInput({
+      type: 'password',
+      autocomplete: 'new-password',
+      name: 'new-password',
+      id: 'kayit-sifre',
+    });
     const error = errorLine();
     const button = submitButton(Strings.registerButton);
 

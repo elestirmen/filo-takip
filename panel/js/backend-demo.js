@@ -26,6 +26,30 @@ const TICK_MS = 5000;
 const CENTER_LAT = mapDefaults.centerLat;
 const CENTER_LNG = mapDefaults.centerLng;
 
+// Açık oturumun kimliği burada saklanır. Gerçek arka uçta bu işi Firebase Auth
+// kendisi yapar (oturum varsayılan olarak tarayıcıda kalıcıdır); demo da aynı
+// davransın diye, yoksa her sayfa yenilemesi kullanıcıyı giriş ekranına atar.
+// Yalnızca uid tutulur, şifre değil.
+const SESSION_KEY = 'filo-takip-demo-oturum';
+
+function readStoredUid() {
+  try {
+    return window.localStorage.getItem(SESSION_KEY);
+  } catch {
+    // Gizli sekmede ya da depolama kapalıyken erişim hata atabilir.
+    return null;
+  }
+}
+
+function writeStoredUid(uid) {
+  try {
+    if (uid === null) window.localStorage.removeItem(SESSION_KEY);
+    else window.localStorage.setItem(SESSION_KEY, uid);
+  } catch {
+    // Oturum yalnızca bu sekmede yaşar; panel yine çalışır.
+  }
+}
+
 // Tekrarlanabilir demo için sabit tohumlu üreteç (Dart tarafındaki Random(42)
 // karşılığı). Math.random() kullanılsaydı her yenilemede başka bir filo çıkardı.
 function seededRandom(seed) {
@@ -62,6 +86,7 @@ export class DemoBackend {
     this._seedGroups();
     this._seedVehicles();
     this._seedUsers();
+    this._restoreSession();
     this._publish();
 
     this._timer = window.setInterval(() => this._moveVehicles(), TICK_MS);
@@ -77,6 +102,7 @@ export class DemoBackend {
       throw new BackendError(Strings.errorInvalidCredentials);
     }
     this._session = { uid, email: normalized };
+    writeStoredUid(uid);
     this._publishViewer();
   }
 
@@ -103,11 +129,13 @@ export class DemoBackend {
       }),
     );
     this._session = { uid, email: normalized };
+    writeStoredUid(uid);
     this._publish();
   }
 
   async signOut() {
     this._session = null;
+    writeStoredUid(null);
     this._publishViewer();
   }
 
@@ -241,6 +269,20 @@ export class DemoBackend {
   }
 
   // -------------------------------------------------------------- İçeriler
+
+  // Kayıtlı oturumu geri yükler. Demo verisi her yenilemede sıfırdan üretildiği
+  // için, kaydedilen uid artık yoksa (örneğin kendi kaydettiği bir hesapsa)
+  // oturum sessizce düşer.
+  _restoreSession() {
+    const uid = readStoredUid();
+    if (uid === null) return;
+    const user = this._users.get(uid);
+    if (user === undefined) {
+      writeStoredUid(null);
+      return;
+    }
+    this._session = { uid, email: user.email };
+  }
 
   _requireAdmin() {
     if (this._session === null || !this._admins.has(this._session.uid)) {
