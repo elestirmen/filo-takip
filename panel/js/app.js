@@ -143,6 +143,12 @@ function createShell(backend, viewer) {
           activate('map');
           mapPage.focusVehicle(vehicleId);
         },
+        // Geçmiş, haritanın yan sütununda oynatma paneli olarak açılır;
+        // araç tablosuyla harita aynı düğmeye aynı şeyi yapsın.
+        onShowHistory: (vehicle) => {
+          activate('map');
+          mapPage.openPlayback(vehicle);
+        },
       })
     : null;
   const groupsPage = isAdmin ? createGroupsPage(backend) : null;

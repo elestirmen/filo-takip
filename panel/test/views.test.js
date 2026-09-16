@@ -99,12 +99,14 @@ describe('panel görünümleri', { skip }, () => {
         return {
           on() {}, remove() {}, invalidateSize() {}, setView() {}, panTo() {},
           fitBounds() {}, getZoom: () => 12,
+        getBounds: () => ({ pad: () => ({ contains: () => true }) }),
         };
       },
       tileLayer: fakeLayer,
       marker: fakeLayer,
       polyline: fakeLayer,
       layerGroup: fakeLayer,
+      circleMarker: fakeLayer,
       divIcon: (options) => options,
       control: { layers: fakeLayer },
       latLngBounds: () => ({}),
@@ -177,6 +179,31 @@ describe('panel görünümleri', { skip }, () => {
     for (const label of ['Grup ata', 'Konum geçmişi', 'Sil']) {
       assert.ok(labels.includes(label), `${label} düğmesi yok`);
     }
+  });
+
+  it('geçmiş rota paneli açılıp canlıya dönebilir', async () => {
+    // Seçili araç önceki testten geliyor.
+    button('Konum geçmişi', $('.detail-actions')).click();
+    await tick(500);
+
+    assert.ok($('.playback'), 'oynatma paneli açılmadı');
+    assert.ok(text().includes('Geçmiş rota'));
+    assert.ok($('.playback-slider'), 'zaman çubuğu yok');
+    assert.ok(button('Oynat'), 'oynat düğmesi yok');
+    // Rapor özeti: demo geçmişi 120 kayıt üretiyor.
+    assert.ok(text().includes('Katedilen yol'), 'rapor özeti yok');
+    assert.ok(text().includes('Durak sayısı'));
+    // Koşullu parçalar null geçerse DOM bunu "null" metnine çevirir.
+    assert.ok(!$('.playback-body').textContent.includes('null'), 'panelde "null" metni var');
+    // Canlı liste bu sırada gizlenir (DOM'dan silinmez, hidden ile kapanır;
+    // CSS'te .side-live[hidden] kuralı display:flex'i ezer).
+    assert.equal($('.side-live').hidden, true, 'canlı liste gizlenmemiş');
+
+    button('Canlıya dön').click();
+    await tick(200);
+    assert.equal($('.playback'), null, 'oynatma paneli kapanmadı');
+    assert.equal($('.side-live').hidden, false, 'canlı listeye dönülmedi');
+    assert.ok($$('.vehicle-row').length > 0, 'araç listesi boş kaldı');
   });
 
   it('araç tablosunda onay bekleyen en üstte durur', async () => {

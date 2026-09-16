@@ -514,22 +514,60 @@ export class DemoBackend {
       frozen: ageMs > 0,
     });
 
-    // Konum geçmişi ekranı boş kalmasın diye geçmişe doğru 120 kayıt üret;
-    // aralık gerçek yazma aralığıyla aynı.
+    this._history.set(id, this._seedHistory({ lat, lng, speedKmh, now, ageMs }));
+  }
+
+  // Aracın geçmiş rotasını şimdiden geriye doğru üretir.
+  //
+  // Önceki sürüm noktaları birbirine ~1 metre uzaklıkta koyuyordu; bu, gerçek
+  // GPS titremesinin altında kaldığı için rapor "0 km yol, hep duruş"
+  // çıkarıyordu. Artık adım uzunluğu gerçek hızdan hesaplanır (45 saniyede
+  // 40 km/s ≈ 500 m) ve yön rastgele sapar, yani rota gerçek bir güzergâh
+  // gibi görünür. Ortaya bir de duruş konur ki durak tespiti denenebilsin.
+  _seedHistory({ lat, lng, speedKmh, now, ageMs }) {
+    const count = 120;
+    // Duran araç geçmişte de durur; yalnızca hareketli olanlara rota üretilir.
+    const stopFrom = speedKmh > 0 ? 46 : -1;
+    const stopTo = speedKmh > 0 ? 60 : -1;
+
+    let heading = this._random() * 2 * Math.PI;
+    let currentLat = lat;
+    let currentLng = lng;
     const samples = [];
-    for (let i = 120; i > 0; i--) {
+
+    // i = 1 en yeni kayıttan bir önceki; geriye doğru yürünür.
+    for (let i = 1; i <= count; i++) {
+      // Duran aracın geçmişi de durgundur; alt sınır yalnızca hareketli
+      // araçlara uygulanır, yoksa hızı sıfır olan araç da yol yapmış görünür.
+      const stopped = speedKmh === 0 || (i >= stopFrom && i <= stopTo);
+      const stepSpeed = stopped ? 0 : Math.max(5, speedKmh + this._random() * 14 - 7);
+
       samples.push(
         new LocationSample({
           id: this._nextPushId(),
-          lat: lat - (dLat * i) / 400,
-          lng: lng - (dLng * i) / 400,
-          speedKmh: speedKmh === 0 ? 0 : Math.max(0, speedKmh + this._random() * 15 - 7),
-          recordedAt: now - ageMs - i * HISTORY_INTERVAL_MS,
+          lat: currentLat,
+          lng: currentLng,
+          speedKmh: stepSpeed,
+          recordedAt: now - ageMs - (i - 1) * HISTORY_INTERVAL_MS,
         }),
       );
+
+      if (stopped) continue;
+      heading += (this._random() - 0.5) * 0.8;
+      const metres = ((stepSpeed * 1000) / 3600) * (HISTORY_INTERVAL_MS / 1000);
+      // Geriye doğru gidildiği için işaret ters.
+      currentLat -= (metres * Math.cos(heading)) / 111320;
+      currentLng -= (metres * Math.sin(heading)) / (111320 * Math.cos((currentLat * Math.PI) / 180));
+      // Merkezden fazla uzaklaşırsa geri döndür; rota bölgede kalsın.
+      if (Math.abs(currentLat - CENTER_LAT) > 0.06 || Math.abs(currentLng - CENTER_LNG) > 0.06) {
+        heading += Math.PI;
+      }
     }
+
+    // En eski kayıt başta.
+    samples.reverse();
     while (samples.length > HISTORY_MAX_RECORDS) samples.shift();
-    this._history.set(id, samples);
+    return samples;
   }
 
   _moveVehicles() {

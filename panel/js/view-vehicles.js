@@ -9,14 +9,9 @@ import { adminSummaryOf, matchesVehicleSearch, sortVehiclesForAdmin } from './ad
 import { clear, el, emptyState, statusDot, textInput } from './ui.js';
 import { formatSpeed, relativeTime } from './time-format.js';
 import { statusColor, statusLabel, vehicleStatusOf } from './vehicle-status.js';
-import {
-  confirmDeleteVehicle,
-  openGroupPicker,
-  openHistory,
-  toggleApproved,
-} from './vehicle-actions.js';
+import { confirmDeleteVehicle, openGroupPicker, toggleApproved } from './vehicle-actions.js';
 
-export function createVehiclesPage(backend, { onShowOnMap }) {
+export function createVehiclesPage(backend, { onShowOnMap, onShowHistory }) {
   let state = null;
 
   const search = textInput({ placeholder: Strings.vehiclesSearchHint });
@@ -127,7 +122,7 @@ export function createVehiclesPage(backend, { onShowOnMap }) {
               el('button', {
                 type: 'button',
                 class: 'btn btn-small btn-ghost',
-                onclick: () => openHistory(backend, vehicle),
+                onclick: () => onShowHistory(vehicle),
               }, Strings.viewHistory),
               el('button', {
                 type: 'button',

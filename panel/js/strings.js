@@ -244,6 +244,34 @@ export const Strings = Object.freeze({
   selfRoleLocked: 'Kendi yetkinizi bu ekrandan değiştiremezsiniz.',
   youBadge: 'Siz',
 
+  // ------------------------------------------------------- Geçmiş rota
+  playbackTitle: 'Geçmiş rota',
+  playbackLoading: 'Geçmiş yükleniyor…',
+  playbackEmpty: 'Bu araç için konum kaydı yok.',
+  playbackNoRoute: 'Kayıtlar tek noktada; çizilecek rota yok.',
+  playbackPlay: 'Oynat',
+  playbackPause: 'Duraklat',
+  playbackReplay: 'Baştan',
+  playbackSpeedLabel: 'Hız',
+  playbackSpeedSlow: 'Yavaş',
+  playbackSpeedNormal: 'Normal',
+  playbackSpeedFast: 'Hızlı',
+  playbackBackToLive: 'Canlıya dön',
+  playbackShowRecords: 'Kayıtları göster',
+  playbackFollow: 'Haritada takip et',
+  stopLabel: 'Durak',
+
+  reportDistance: 'Katedilen yol',
+  reportMoving: 'Hareket süresi',
+  reportStopped: 'Duruş süresi',
+  reportMaxSpeed: 'En yüksek hız',
+  reportAvgSpeed: 'Ortalama hız',
+  reportStops: 'Durak sayısı',
+  reportRange: 'Kapsanan aralık',
+  reportWindowNote:
+    'Uygulama araç başına en fazla 500 konum kaydı tutar (45 saniyede bir), '
+    + 'yani geçmiş yaklaşık son 6 saati kapsar. Daha eskisi otomatik silinir.',
+
   // ------------------------------------------------------- Konum geçmişi
   historyTitle: 'Konum geçmişi',
   historyEmpty: 'Bu araç için konum kaydı yok.',
