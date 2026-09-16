@@ -408,7 +408,13 @@ dl, dd { margin: 0; }
 
 .map-page { height: 100%; display: grid; grid-template-columns: 1fr 360px; }
 .map-holder { position: relative; min-width: 0; }
-.map-canvas { position: absolute; inset: 0; background: var(--surface-alt); }
+
+/* Yükseklik `height` ile verilir, `inset` ile değil: Leaflet konteynere satır
+   içi `position: relative` yazabiliyor ve bu, mutlak konumlandırmayı sessizce
+   devre dışı bırakıp haritayı sıfır yüksekliğe düşürüyordu. `height: 100%`
+   position'dan bağımsız çalışır. Üstteki özet kartı .map-holder'a göre
+   konumlandığı için o hâlâ position: relative kalmalı. */
+.map-canvas { width: 100%; height: 100%; background: var(--surface-alt); }
 
 .map-overlay { position: absolute; top: 14px; left: 14px; z-index: 500; max-width: 280px; }
 

@@ -85,6 +85,11 @@ function render() {
       shell = createShell(backend, viewer);
       return shell.node;
     });
+    // İlk sekme ancak kabuk belgeye eklendikten sonra açılır. Harita bundan
+    // önce kurulursa Leaflet, bağlı olmayan elemanın position değerini
+    // okuyamayıp üzerine satır içi `position: relative` yazar; o da
+    // .map-canvas kuralını ezip haritayı sıfır yükseklikte bırakır.
+    shell.start();
   }
   renderIfShell();
 }
@@ -225,6 +230,6 @@ function createShell(backend, viewer) {
     }
   }
 
-  activate('map');
-  return { node, update };
+  // activate burada değil, kabuk belgeye eklendikten sonra çağrılır.
+  return { node, update, start: () => activate('map') };
 }

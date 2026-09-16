@@ -37,12 +37,25 @@ export function createMapPage(backend) {
   const listHost = el('div', { class: 'vehicle-list' });
   const detailHost = el('div', { class: 'detail-host' });
 
-  const mapView = new MapView(mapHost, {
-    onSelect: (vehicleId) => {
-      selectedId = vehicleId;
-      draw();
-    },
-  });
+  // Leaflet haritası sayfa **belgeye eklendikten sonra** kurulur.
+  //
+  // Bağlı olmayan bir elemanla kurulursa Leaflet, elemanın hesaplanan
+  // position değerini okuyamayıp üzerine satır içi `position: relative`
+  // yazar; bu da .map-canvas kuralını ezip haritayı sıfır yükseklikte
+  // bırakır. Bu yüzden kurulum onShow()'a ertelenir.
+  let mapView = null;
+
+  function ensureMap() {
+    if (mapView === null) {
+      mapView = new MapView(mapHost, {
+        onSelect: (vehicleId) => {
+          selectedId = vehicleId;
+          draw();
+        },
+      });
+    }
+    return mapView;
+  }
 
   const fitButton = el('button', {
     type: 'button',
@@ -81,10 +94,10 @@ export function createMapPage(backend) {
     ]),
   ]);
 
-  // Bu sayfaya dönüldüğünde Leaflet ölçüyü yeniden alsın; gizliyken kurulan
-  // harita yoksa yarım bir tuval olarak kalır.
+  // Sayfa açıldığında harita (gerekiyorsa) kurulur ve Leaflet ölçüyü yeniden
+  // alır; gizliyken kurulan harita yoksa yarım bir tuval olarak kalır.
   function onShow() {
-    mapView.invalidateSize();
+    ensureMap().invalidateSize();
     if (state !== null) draw();
   }
 
@@ -98,7 +111,8 @@ export function createMapPage(backend) {
   }
 
   function draw() {
-    if (state === null) return;
+    // Harita henüz kurulmadıysa sayfa görünür değildir; onShow() çizecek.
+    if (state === null || mapView === null) return;
     const { viewer, groups, nowMs } = state;
     const visible = visibleVehicles();
     const shown = visible.filter((vehicle) => filterMatches(filter, vehicle));
@@ -310,6 +324,7 @@ export function createMapPage(backend) {
   function focusVehicle(vehicleId) {
     filter = groupFilterAll();
     selectedId = vehicleId;
+    ensureMap();
     draw();
     mapView.setSelected(vehicleId, { focus: true });
   }

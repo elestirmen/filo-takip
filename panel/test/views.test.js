@@ -30,6 +30,11 @@ const skip = JSDOM === null
 
 describe('panel görünümleri', { skip }, () => {
   let window;
+  // L.map çağrıldığı anda konteyner belgeye bağlı mıydı? Bağlı değilse
+  // Leaflet üzerine satır içi `position: relative` yazar ve harita gerçek
+  // tarayıcıda sıfır yükseklikte kalır. jsdom yerleşim hesaplamadığı için
+  // bunu ancak böyle yakalayabiliriz.
+  let mapContainerConnectedAtInit = null;
 
   const app = () => window.document.getElementById('app');
   const text = () => app().textContent;
@@ -89,10 +94,13 @@ describe('panel görünümleri', { skip }, () => {
     window = dom.window;
 
     globalThis.L = {
-      map: () => ({
-        on() {}, remove() {}, invalidateSize() {}, setView() {}, panTo() {},
-        fitBounds() {}, getZoom: () => 12,
-      }),
+      map: (container) => {
+        mapContainerConnectedAtInit = container.isConnected;
+        return {
+          on() {}, remove() {}, invalidateSize() {}, setView() {}, panTo() {},
+          fitBounds() {}, getZoom: () => 12,
+        };
+      },
       tileLayer: fakeLayer,
       circleMarker: fakeLayer,
       polyline: fakeLayer,
@@ -142,6 +150,15 @@ describe('panel görünümleri', { skip }, () => {
     assert.deepEqual(tabs, ['Harita', 'Araçlar', 'Gruplar', 'Kullanıcılar', 'Ayarlar']);
     assert.ok($('.badge-admin'), 'yönetici rozeti yok');
     assert.ok(text().includes('DEMO'), 'demo rozeti yok');
+  });
+
+  it('harita, konteyner belgeye eklendikten sonra kurulur', () => {
+    assert.equal(
+      mapContainerConnectedAtInit,
+      true,
+      'L.map bağlı olmayan elemanla çağrıldı: Leaflet satır içi position yazar '
+      + 've harita gerçek tarayıcıda sıfır yükseklikte kalır',
+    );
   });
 
   it('yönetici haritada tüm araçları görür', () => {
