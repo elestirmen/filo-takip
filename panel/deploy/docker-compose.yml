@@ -23,7 +23,14 @@ services:
     expose:
       - "80"
     volumes:
-      - /opt/filo-takip/panel:/usr/share/nginx/html:ro
+      # Bağlama **depo köküne** yapılır, panel/ klasörüne değil.
+      #
+      # Tek bir dizini bağlamak inode'a bağlanmak demektir: `git checkout` ya
+      # da dal değiştirme o dizini silip yeniden yaratırsa konteyner eski ve
+      # artık boş olan inode'u görmeye devam eder ve site sessizce 404'e
+      # düşer. Depo kökünü git hiçbir zaman değiştirmez; nginx de yolu her
+      # istekte yeniden çözdüğü için panel/ altı serbestçe değişebilir.
+      - /opt/filo-takip:/srv/filo-takip:ro
       - /opt/filo-takip/panel/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]

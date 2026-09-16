@@ -169,6 +169,20 @@ devam eder:
 docker compose -f /opt/filo-takip/panel/deploy/docker-compose.yml up -d --force-recreate
 ```
 
+### Neden depo kökü bağlanıyor
+
+Konteynere `panel/` değil **depo kökü** bağlanır ve nginx kökü
+`/srv/filo-takip/panel` olarak ayarlanır. Sebebi bir kez yaşandı: `panel/`
+doğrudan bağlıyken `git checkout` ile dal değiştirmek o dizini silip yeniden
+yarattı, konteyner eski ve artık boş olan inode'u görmeye devam etti ve site
+sessizce 404'e düştü. Depo kökünü git hiçbir zaman değiştirmez; nginx de yolu
+her istekte yeniden çözdüğü için `panel/` altı serbestçe değişebilir.
+
+Buna bir de Cloudflare eklenir: site bozukken alınan 404'ler uçta önbelleğe
+girer ve kaynak düzeldikten sonra birkaç dakika daha 404 dönmeye devam eder
+(Cloudflare 404'leri varsayılan olarak 3 dakika önbellekler). Düzelttikten
+sonra hemen sonuç almak isterseniz Cloudflare panelinden önbelleği boşaltın.
+
 ## Testler
 
 Node'un kendi test koşucusu kullanılır; tarayıcı ya da Firebase gerekmez:
