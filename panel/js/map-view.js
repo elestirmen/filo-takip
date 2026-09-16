@@ -11,8 +11,31 @@ import { formatCoords, formatSpeed, relativeTime } from './time-format.js';
 import { mapDefaults } from './config.js';
 import { statusColor, statusLabel, vehicleStatusOf } from './vehicle-status.js';
 
-const RADIUS = 9;
-const RADIUS_SELECTED = 13;
+// İşaretçi ölçüsü. Sivri uç tam koordinatın üstünde dursun diye tutturma
+// noktası alt uçtadır.
+const PIN_WIDTH = 32;
+const PIN_HEIGHT = 40;
+const PIN_ANCHOR = [16, 39];
+
+// Durum rengiyle boyanan damla biçimli iğne ve içinde beyaz bir araç.
+//
+// Metin araya girmediği için (renk sabit paletten gelir, plaka ayrı bir
+// tooltip'te durur) SVG'yi dize olarak kurmak güvenlidir.
+function pinSvg(color) {
+  return `<svg viewBox="0 0 32 40" width="${PIN_WIDTH}" height="${PIN_HEIGHT}"
+    xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M16 39C16 39 2.5 23.8 2.5 15A13.5 13.5 0 1 1 29.5 15C29.5 23.8 16 39 16 39Z"
+      fill="${color}" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+    <g fill="#fff">
+      <path d="M11.5 10.4h9l2.1 3.3H9.4z"/>
+      <rect x="6.8" y="13.3" width="18.4" height="4.7" rx="1.7"/>
+    </g>
+    <g fill="rgba(0,0,0,0.42)">
+      <circle cx="11.3" cy="18" r="1.6"/>
+      <circle cx="20.7" cy="18" r="1.6"/>
+    </g>
+  </svg>`;
+}
 
 export class MapView {
   constructor(container, { onSelect } = {}) {
@@ -55,9 +78,13 @@ export class MapView {
   setSelected(vehicleId, { focus = false } = {}) {
     this._selectedId = vehicleId;
     for (const [id, entry] of this._markers) {
-      entry.marker.setStyle(this._styleFor(entry.status, id === vehicleId));
-      entry.marker.setRadius(id === vehicleId ? RADIUS_SELECTED : RADIUS);
-      if (id === vehicleId) entry.marker.bringToFront();
+      const selected = id === vehicleId;
+      if (entry.selected !== selected) {
+        entry.marker.setIcon(this._iconFor(entry.status, selected));
+        entry.selected = selected;
+      }
+      // Seçili araç diğerlerinin üstünde kalsın.
+      entry.marker.setZIndexOffset(selected ? 1000 : 0);
     }
     if (focus && vehicleId !== null) {
       const entry = this._markers.get(vehicleId);
@@ -91,9 +118,10 @@ export class MapView {
       let entry = this._markers.get(vehicle.id);
 
       if (entry === undefined) {
-        const marker = L.circleMarker(latLng, {
-          ...this._styleFor(status, selected),
-          radius: selected ? RADIUS_SELECTED : RADIUS,
+        const marker = L.marker(latLng, {
+          icon: this._iconFor(status, selected),
+          zIndexOffset: selected ? 1000 : 0,
+          keyboard: false,
         });
         marker.on('click', () => {
           this.setSelected(vehicle.id);
@@ -103,16 +131,20 @@ export class MapView {
         marker.bindTooltip(el('span', { class: 'map-plate', text: vehicle.plate }), {
           permanent: true,
           direction: 'right',
-          offset: [10, 0],
+          // İğnenin başının hizasında dursun; tutturma noktası alt uçta.
+          offset: [12, -26],
           className: 'map-tooltip',
         });
-        entry = { marker, status };
+        entry = { marker, status, selected };
         this._markers.set(vehicle.id, entry);
       } else {
         entry.marker.setLatLng(latLng);
-        if (entry.status !== status || selected) {
-          entry.marker.setStyle(this._styleFor(status, selected));
+        // İkon yalnızca gerçekten değiştiyse kurulur; her tikte yenilemek
+        // işaretçiyi titretirdi.
+        if (entry.status !== status || entry.selected !== selected) {
+          entry.marker.setIcon(this._iconFor(status, selected));
           entry.status = status;
+          entry.selected = selected;
         }
         entry.marker.setTooltipContent(el('span', { class: 'map-plate', text: vehicle.plate }));
       }
@@ -182,14 +214,14 @@ export class MapView {
     this._markers.clear();
   }
 
-  _styleFor(status, selected) {
-    const color = statusColor(status);
-    return {
-      color: selected ? '#0D47A1' : '#FFFFFF',
-      weight: selected ? 4 : 2,
-      fillColor: color,
-      fillOpacity: 0.95,
-    };
+  _iconFor(status, selected) {
+    return L.divIcon({
+      className: `vehicle-pin${selected ? ' vehicle-pin-selected' : ''}`,
+      html: pinSvg(statusColor(status)),
+      iconSize: [PIN_WIDTH, PIN_HEIGHT],
+      iconAnchor: PIN_ANCHOR,
+      popupAnchor: [0, -34],
+    });
   }
 
   _popupFor(vehicle, { groups, viewer, nowMs, status, fieldVisibilityFor }) {

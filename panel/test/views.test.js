@@ -72,7 +72,7 @@ describe('panel görünümleri', { skip }, () => {
       addTo() { return this; },
       on() { return this; },
       remove() {},
-      setStyle() {}, setRadius() {}, bringToFront() {},
+      setIcon() {}, setZIndexOffset() {},
       setLatLng(latLng) { this._latLng = latLng; return this; },
       getLatLng() { return this._latLng ?? { lat: 0, lng: 0 }; },
       bindTooltip() { return this; },
@@ -102,8 +102,9 @@ describe('panel görünümleri', { skip }, () => {
         };
       },
       tileLayer: fakeLayer,
-      circleMarker: fakeLayer,
+      marker: fakeLayer,
       polyline: fakeLayer,
+      divIcon: (options) => options,
       latLngBounds: () => ({}),
     };
     globalThis.window = window;

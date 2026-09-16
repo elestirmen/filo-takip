@@ -506,6 +506,28 @@ dl, dd { margin: 0; }
 .detail-plate { font-size: 16px; font-weight: 700; }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* Araç işaretçisi: durum renginde damla iğne, içinde beyaz araç.
+   Leaflet'in divIcon'a verdiği beyaz kutu ve kenarlık temizlenir. */
+.vehicle-pin {
+  background: transparent;
+  border: 0;
+}
+.vehicle-pin svg {
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(16, 24, 40, 0.45));
+  transition: transform 0.12s ease-out;
+}
+/* Seçili araç büyür ve öne çıkar; büyüme sivri uçtan olur ki işaretçi
+   koordinatın üstünde kalsın. */
+.vehicle-pin-selected svg {
+  transform: scale(1.22);
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 3px 6px rgba(16, 24, 40, 0.55));
+}
+@media (prefers-reduced-motion: reduce) {
+  .vehicle-pin svg { transition: none; }
+}
+
 /* Leaflet üstündeki etiketler ve balon */
 .map-tooltip {
   background: var(--surface);
