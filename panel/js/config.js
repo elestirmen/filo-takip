@@ -1,3 +1,5 @@
+import { Strings } from './strings.js';
+
 // Panelin arka uç seçimi.
 //
 // Aşağıdaki nesne boş kaldığı sürece panel **demo kipinde** çalışır: veriler
@@ -37,5 +39,32 @@ export const mapDefaults = {
   centerLng: 34.7142,
   zoom: 12,
   focusZoom: 15,
-  tileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 };
+
+// Harita katmanları. Sağ üstteki seçiciden değiştirilir, seçim tarayıcıda
+// hatırlanır. İkisi de anahtarsız ve ücretsizdir; kullanım koşulları atıf
+// göstermeyi şart koşar, o yüzden attribution alanları boş bırakılmamalıdır.
+export const mapLayers = [
+  {
+    id: 'sokak',
+    label: Strings.mapLayerStreet,
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap katkıcıları',
+    maxZoom: 19,
+  },
+  {
+    id: 'uydu',
+    label: Strings.mapLayerSatellite,
+    // Esri World Imagery. Dikkat: karo yolu {z}/{y}/{x} sırasındadır,
+    // OpenStreetMap'teki {z}/{x}/{y} değil.
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Uydu görüntüleri &copy; Esri',
+    maxZoom: 19,
+    // Çıplak uyduda sokak ve yer adı yok; okunur kalsın diye üstüne saydam
+    // bir etiket katmanı bindirilir.
+    labelsUrl:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  },
+];
+
+export const defaultMapLayerId = 'sokak';

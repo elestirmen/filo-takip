@@ -33,6 +33,22 @@ Uygulamadaki `lib/core/visibility_rules.dart` ile aynı mantıktır: kendi grubu
 > [database.rules.json](../database.rules.json) dosyasıdır; aşağıdaki
 > "Güvenlik notu" bölümüne bakın.
 
+## Harita
+
+Sağ üstteki seçiciden iki katman arasında geçilir; seçim tarayıcıda hatırlanır.
+
+| Katman | Kaynak | Not |
+| --- | --- | --- |
+| Sokak | OpenStreetMap | Uygulamadaki harita ile aynı karolar |
+| Uydu | Esri World Imagery | Üstüne yer adı etiketleri bindirilir, yoksa okunmaz |
+
+İkisi de anahtarsız ve ücretsizdir ama **atıf göstermek koşuluyla**; katman
+tanımlarındaki `attribution` alanları boş bırakılmamalıdır
+(`js/config.js` -> `mapLayers`).
+
+Araçlar durum renginde damla biçimli iğnelerle, içlerinde araç silueti ve
+yanlarında plaka etiketiyle gösterilir. Seçili araç büyür ve öne alınır.
+
 ## Demo kipi
 
 `js/config.js` içindeki Firebase yapılandırması boş olduğu sürece panel demo

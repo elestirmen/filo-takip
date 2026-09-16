@@ -8,7 +8,27 @@
 import { Strings } from './strings.js';
 import { el } from './ui.js';
 import { formatCoords, formatSpeed, relativeTime } from './time-format.js';
-import { mapDefaults } from './config.js';
+import { defaultMapLayerId, mapDefaults, mapLayers } from './config.js';
+
+// Seçilen harita katmanı tarayıcıda hatırlanır.
+const LAYER_KEY = 'filo-takip-harita-katmani';
+
+function readStoredLayerId() {
+  try {
+    return window.localStorage.getItem(LAYER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredLayerId(id) {
+  try {
+    if (id === null) window.localStorage.removeItem(LAYER_KEY);
+    else window.localStorage.setItem(LAYER_KEY, id);
+  } catch {
+    // Depolama kapalıysa seçim yalnızca bu oturumda yaşar.
+  }
+}
 import { statusColor, statusLabel, vehicleStatusOf } from './vehicle-status.js';
 
 // İşaretçi ölçüsü. Sivri uç tam koordinatın üstünde dursun diye tutturma
@@ -56,13 +76,44 @@ export class MapView {
       attributionControl: true,
     });
 
-    L.tileLayer(mapDefaults.tileUrl, {
-      maxZoom: 19,
-      attribution: Strings.mapAttribution,
-    }).addTo(this._map);
+    this._addBaseLayers();
 
     this._map.on('dragstart', () => {
       this._followSelected = false;
+    });
+  }
+
+  // Sokak / uydu katmanları ve sağ üstteki seçici.
+  //
+  // Seçim tarayıcıda hatırlanır: filoyu uydu üzerinde izlemeyi tercih eden
+  // biri her açılışta yeniden seçmek zorunda kalmasın.
+  _addBaseLayers() {
+    const options = {};
+    let active = null;
+    const savedId = readStoredLayerId();
+
+    for (const layer of mapLayers) {
+      const tiles = L.tileLayer(layer.url, {
+        maxZoom: layer.maxZoom,
+        attribution: layer.attribution,
+      });
+      // Etiket katmanı varsa taban ve etiketler birlikte tek katman sayılır.
+      const base = layer.labelsUrl
+        ? L.layerGroup([tiles, L.tileLayer(layer.labelsUrl, { maxZoom: layer.maxZoom })])
+        : tiles;
+
+      options[layer.label] = base;
+      const wanted = savedId !== null ? savedId : defaultMapLayerId;
+      if (layer.id === wanted) active = base;
+      base.filoLayerId = layer.id;
+    }
+
+    // Kayıtlı kimlik artık tanınmıyorsa ilk katmana düşülür.
+    (active ?? Object.values(options)[0]).addTo(this._map);
+
+    L.control.layers(options, null, { position: 'topright' }).addTo(this._map);
+    this._map.on('baselayerchange', (event) => {
+      writeStoredLayerId(event.layer?.filoLayerId ?? null);
     });
   }
 

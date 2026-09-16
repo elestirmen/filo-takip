@@ -506,6 +506,22 @@ dl, dd { margin: 0; }
 .detail-plate { font-size: 16px; font-weight: 700; }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* Katman seçici (sokak / uydu) — Leaflet'in beyaz kutusu panel temasına uyar. */
+.leaflet-control-layers {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.leaflet-control-layers-expanded { padding: 8px 12px 8px 10px; }
+.leaflet-control-layers label { font-size: 13.5px; margin: 2px 0; }
+.leaflet-control-layers-selector { accent-color: var(--primary); margin-right: 6px; }
+.leaflet-control-layers-toggle {
+  background-color: var(--surface);
+  border-radius: var(--radius);
+}
+
 /* Araç işaretçisi: durum renginde damla iğne, içinde beyaz araç.
    Leaflet'in divIcon'a verdiği beyaz kutu ve kenarlık temizlenir. */
 .vehicle-pin {

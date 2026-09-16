@@ -104,7 +104,9 @@ describe('panel görünümleri', { skip }, () => {
       tileLayer: fakeLayer,
       marker: fakeLayer,
       polyline: fakeLayer,
+      layerGroup: fakeLayer,
       divIcon: (options) => options,
+      control: { layers: fakeLayer },
       latLngBounds: () => ({}),
     };
     globalThis.window = window;
