@@ -28,7 +28,7 @@ import {
 
 import { BackendError } from './backend-error.js';
 import { EventChannel, LatestValue } from './emitter.js';
-import { GroupConfig, LocationSample, Vehicle, Viewer, WebUser } from './models.js';
+import { Geofence, GroupConfig, LocationSample, Vehicle, Viewer, WebUser } from './models.js';
 import { compareText } from './admin-rules.js';
 import { firebaseConfig } from './config.js';
 import { Strings } from './strings.js';
@@ -38,6 +38,7 @@ const GROUP_CONFIGS_PATH = 'groupConfigs';
 const LOCATION_HISTORY_PATH = 'locationHistory';
 const ADMINS_PATH = 'admins';
 const WEB_USERS_PATH = 'webUsers';
+const GEOFENCES_PATH = 'geofences';
 const SERVER_TIME_OFFSET_PATH = '.info/serverTimeOffset';
 
 const HISTORY_READ_LIMIT = 500;
@@ -80,6 +81,7 @@ export class FirebaseBackend {
     this.vehicles = new LatestValue([]);
     this.groups = new LatestValue([]);
     this.users = new LatestValue([]);
+    this.geofences = new LatestValue([]);
     this.adminUids = new LatestValue(new Set());
     this.viewer = new LatestValue(null);
     this.errors = new EventChannel();
@@ -202,6 +204,14 @@ export class FirebaseBackend {
         group.visibleGroups.filter((name) => name !== groupId);
     }
     await this._writeRoot(updates, Strings.errorDeleteFailed);
+  }
+
+  async saveGeofence(geofence) {
+    await this._write(`${GEOFENCES_PATH}/${geofence.id}`, geofence.toMap(), Strings.errorSaveFailed);
+  }
+
+  async deleteGeofence(id) {
+    await this._writeRoot({ [`${GEOFENCES_PATH}/${id}`]: null }, Strings.errorDeleteFailed);
   }
 
   async setUserApproved(uid, approved) {
@@ -377,6 +387,21 @@ export class FirebaseBackend {
 
     this._sessionUnsubscribers.push(
       onValue(
+        ref(this._database, GEOFENCES_PATH),
+        (snapshot) => {
+          const zones = [];
+          snapshot.forEach((child) => {
+            zones.push(Geofence.fromMap(child.key, child.val()));
+          });
+          zones.sort((a, b) => compareText(a.name, b.name));
+          this.geofences.add(zones);
+        },
+        () => this.errors.add(Strings.errorGeofencesStream),
+      ),
+    );
+
+    this._sessionUnsubscribers.push(
+      onValue(
         ref(this._database, GROUP_CONFIGS_PATH),
         (snapshot) => {
           const groups = [];
@@ -453,6 +478,7 @@ export class FirebaseBackend {
     this.vehicles.add([]);
     this.groups.add([]);
     this.users.add([]);
+    this.geofences.add([]);
     this.adminUids.add(new Set());
   }
 }

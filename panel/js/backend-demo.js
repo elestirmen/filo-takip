@@ -9,7 +9,7 @@
 
 import { BackendError } from './backend-error.js';
 import { EventChannel, LatestValue } from './emitter.js';
-import { GroupConfig, LocationSample, Vehicle, Viewer, WebUser } from './models.js';
+import { Geofence, GroupConfig, LocationSample, Vehicle, Viewer, WebUser } from './models.js';
 import { compareText } from './admin-rules.js';
 import { mapDefaults } from './config.js';
 import { Strings } from './strings.js';
@@ -69,6 +69,7 @@ export class DemoBackend {
     this._history = new Map();
     this._motions = new Map();
     this._users = new Map();
+    this._geofences = new Map();
     this._admins = new Set();
     this._passwords = new Map();
 
@@ -79,6 +80,7 @@ export class DemoBackend {
     this.vehicles = new LatestValue([]);
     this.groups = new LatestValue([]);
     this.users = new LatestValue([]);
+    this.geofences = new LatestValue([]);
     this.adminUids = new LatestValue(new Set());
     this.viewer = new LatestValue(null);
     this.errors = new EventChannel();
@@ -86,6 +88,7 @@ export class DemoBackend {
     this._seedGroups();
     this._seedVehicles();
     this._seedUsers();
+    this._seedGeofences();
     this._restoreSession();
     this._publish();
 
@@ -215,6 +218,20 @@ export class DemoBackend {
     this._publish();
   }
 
+  async saveGeofence(geofence) {
+    await this._delay();
+    this._requireAdmin();
+    this._geofences.set(geofence.id, geofence);
+    this._publish();
+  }
+
+  async deleteGeofence(id) {
+    await this._delay();
+    this._requireAdmin();
+    this._geofences.delete(id);
+    this._publish();
+  }
+
   async setUserApproved(uid, approved) {
     await this._delay();
     this._requireAdmin();
@@ -317,9 +334,11 @@ export class DemoBackend {
       compareText(a.groupId, b.groupId),
     );
     const userList = [...this._users.values()];
+    const zoneList = [...this._geofences.values()].sort((a, b) => compareText(a.name, b.name));
     this.vehicles.add(vehicleList);
     this.groups.add(groupList);
     this.users.add(userList);
+    this.geofences.add(zoneList);
     this.adminUids.add(new Set(this._admins));
     this._publishViewer();
   }
@@ -360,6 +379,8 @@ export class DemoBackend {
         visibleGroups: ['Kaman'],
         showSpeed: true,
         showDriverName: true,
+        // Merkez araçları 50 km/s üstünde uyarı üretir.
+        speedLimitKmh: 50,
       }),
     );
     this._groups.set(
@@ -371,6 +392,27 @@ export class DemoBackend {
         showDriverName: true,
       }),
     );
+  }
+
+  // Demo bölgeleri: biri araçların dolaştığı merkezde (giriş/çıkış uyarısı
+  // kendiliğinden tetiklenir), biri kenarda.
+  _seedGeofences() {
+    this._geofences.set('merkez-depo', new Geofence({
+      id: 'merkez-depo',
+      name: 'Merkez Depo',
+      lat: CENTER_LAT,
+      lng: CENTER_LNG,
+      radiusM: 2500,
+      createdAt: this.nowMs() - 86400000,
+    }));
+    this._geofences.set('kuzey-saha', new Geofence({
+      id: 'kuzey-saha',
+      name: 'Kuzey Saha',
+      lat: CENTER_LAT + 0.022,
+      lng: CENTER_LNG + 0.02,
+      radiusM: 1800,
+      createdAt: this.nowMs() - 86400000,
+    }));
   }
 
   _seedUsers() {

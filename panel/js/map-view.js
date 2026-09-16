@@ -68,6 +68,8 @@ export class MapView {
     this._playbackMarker = null;
     // Geçmiş rotası açıkken canlı işaretçiler gizlenir.
     this._liveVisible = true;
+    this._zoneLayers = new Map();
+    this._pickHandler = null;
     // İlk veri gelince haritayı filoya sığdırmak için; sonraki
     // güncellemelerde kullanıcının kaydırdığı görünüm korunur.
     this._didInitialFit = false;
@@ -119,6 +121,64 @@ export class MapView {
     this._map.on('baselayerchange', (event) => {
       writeStoredLayerId(event.layer?.filoLayerId ?? null);
     });
+  }
+
+  // ------------------------------------------------------------- Bölgeler
+
+  // Tanımlı bölgeleri daire olarak çizer. Kimliğe göre saklanır: her veri
+  // güncellemesinde yeniden kurmak haritayı titretirdi.
+  showGeofences(zones) {
+    const seen = new Set();
+    for (const zone of zones) {
+      seen.add(zone.id);
+      let circle = this._zoneLayers.get(zone.id);
+      if (circle === undefined) {
+        circle = L.circle([zone.lat, zone.lng], {
+          radius: zone.radiusM,
+          color: '#6A1B9A',
+          weight: 2,
+          fillColor: '#6A1B9A',
+          fillOpacity: 0.08,
+          interactive: false,
+        }).addTo(this._map);
+        this._zoneLayers.set(zone.id, circle);
+      } else {
+        circle.setLatLng([zone.lat, zone.lng]);
+        circle.setRadius(zone.radiusM);
+      }
+      circle.bindTooltip(el('span', { class: 'map-plate', text: zone.name }), {
+        permanent: true,
+        direction: 'center',
+        className: 'map-tooltip map-tooltip-zone',
+      });
+    }
+    for (const [id, circle] of [...this._zoneLayers]) {
+      if (seen.has(id)) continue;
+      circle.remove();
+      this._zoneLayers.delete(id);
+    }
+  }
+
+  // Bölge merkezi seçme kipi: bir sonraki harita tıklaması koordinatı verir.
+  startPicking(onPick) {
+    this.stopPicking();
+    this._pickHandler = (event) => {
+      this.stopPicking();
+      onPick(event.latlng.lat, event.latlng.lng);
+    };
+    this._map.on('click', this._pickHandler);
+    this._map.getContainer().classList.add('map-picking');
+  }
+
+  stopPicking() {
+    if (this._pickHandler === null) return;
+    this._map.off('click', this._pickHandler);
+    this._pickHandler = null;
+    this._map.getContainer().classList.remove('map-picking');
+  }
+
+  get picking() {
+    return this._pickHandler !== null;
   }
 
   // Harita bir sekme gizliyken kurulduysa Leaflet boyutunu yanlış ölçer.

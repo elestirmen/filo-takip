@@ -16,11 +16,13 @@ import {
   visibleVehiclesFor,
 } from './visibility-rules.js';
 import { MapView } from './map-view.js';
-import { clear, el, emptyState, statusDot } from './ui.js';
+import { clear, confirmDialog, el, emptyState, runAction, statusDot, toast } from './ui.js';
 import { fleetSummaryOf, statusColor, statusLabel, vehicleStatusOf } from './vehicle-status.js';
 import { formatSpeed, relativeTime } from './time-format.js';
+import { formatDistance } from './geo.js';
 import { confirmDeleteVehicle, openGroupPicker, toggleApproved } from './vehicle-actions.js';
 import { createPlaybackPanel } from './view-playback.js';
+import { openZoneEditor } from './view-zones.js';
 
 export function createMapPage(backend) {
   let state = null;
@@ -34,6 +36,7 @@ export function createMapPage(backend) {
   const filterHost = el('div', { class: 'chip-row' });
   const listHost = el('div', { class: 'vehicle-list' });
   const detailHost = el('div', { class: 'detail-host' });
+  const zoneHost = el('div', { class: 'zone-section' });
 
   // Leaflet haritası sayfa **belgeye eklendikten sonra** kurulur.
   //
@@ -79,6 +82,7 @@ export function createMapPage(backend) {
     filterHost,
     listHost,
     detailHost,
+    zoneHost,
   ]);
   const playbackHost = el('div', { class: 'side-playback' });
 
@@ -124,6 +128,8 @@ export function createMapPage(backend) {
     drawFilters(visible, viewer);
     drawList(shown, nowMs, viewer, groups);
     drawDetail(shown, nowMs, viewer, groups);
+    mapView.showGeofences(state.geofences);
+    drawZones(viewer);
 
     followButton.textContent = mapView.following ? Strings.mapFollowing : Strings.mapFollow;
     followButton.classList.toggle('btn-active', mapView.following);
@@ -312,6 +318,85 @@ export function createMapPage(backend) {
       el('dt', { text: label }),
       el('dd', { text: value }),
     ]);
+  }
+
+  // Bölge listesi. İzleyici bölgeleri haritada görür ama düzenleyemez.
+  function drawZones(viewer) {
+    clear(zoneHost);
+    const isAdmin = viewer.role === Role.admin;
+    const zones = state.geofences;
+    if (zones.length === 0 && !isAdmin) return;
+
+    zoneHost.append(
+      el('div', { class: 'zone-row' }, [
+        el('span', { class: 'side-title', text: Strings.zonesTitle }),
+        isAdmin
+          ? el('button', {
+              type: 'button',
+              class: `btn btn-ghost btn-small ${mapView.picking ? 'btn-active' : ''}`,
+              onclick: () => (mapView.picking ? cancelPick() : startPick()),
+            }, mapView.picking ? Strings.zoneAddCancel : Strings.zoneAdd)
+          : null,
+      ]),
+    );
+
+    if (mapView.picking) {
+      zoneHost.append(el('p', { class: 'field-hint', text: Strings.zoneAddHint }));
+    }
+    if (zones.length === 0) {
+      zoneHost.append(el('p', { class: 'field-hint', text: Strings.zonesEmpty }));
+      return;
+    }
+
+    for (const zone of zones) {
+      zoneHost.append(
+        el('div', { class: 'zone-row' }, [
+          el('div', {}, [
+            el('div', { class: 'zone-name', text: zone.name }),
+            el('div', { class: 'zone-meta', text: formatDistance(zone.radiusM) }),
+          ]),
+          isAdmin
+            ? el('div', { class: 'row-actions' }, [
+                el('button', {
+                  type: 'button',
+                  class: 'btn btn-small btn-ghost',
+                  onclick: () => openZoneEditor({ backend, zone }),
+                }, Strings.zoneEdit),
+                el('button', {
+                  type: 'button',
+                  class: 'btn btn-small btn-danger',
+                  onclick: () => removeZone(zone),
+                }, Strings.delete),
+              ])
+            : null,
+        ]),
+      );
+    }
+  }
+
+  function startPick() {
+    mapView.startPicking((lat, lng) => {
+      openZoneEditor({ backend, zone: null, lat, lng });
+      draw();
+    });
+    toast(Strings.zoneAddHint, 'info');
+    draw();
+  }
+
+  function cancelPick() {
+    mapView.stopPicking();
+    draw();
+  }
+
+  async function removeZone(zone) {
+    const confirmed = await confirmDialog({
+      title: Strings.zoneDeleteTitle,
+      message: `${zone.name} — ${Strings.zoneDeleteMessage}`,
+      confirmLabel: Strings.delete,
+      danger: true,
+    });
+    if (!confirmed) return;
+    await runAction(null, () => backend.deleteGeofence(zone.id), Strings.zoneDeleted);
   }
 
   // Geçmiş rota kipine geçer. Panel kendi verisini okur ve haritayı devralır.

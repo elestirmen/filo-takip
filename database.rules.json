@@ -4,34 +4,85 @@
       ".read": "auth != null",
       "$uid": {
         ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
-        "plate":      { ".write": "auth != null && auth.uid == $uid" },
-        "driverName": { ".write": "auth != null && auth.uid == $uid" },
-        "lat":        { ".write": "auth != null && auth.uid == $uid" },
-        "lng":        { ".write": "auth != null && auth.uid == $uid" },
-        "speedKmh":   { ".write": "auth != null && auth.uid == $uid" },
-        "updatedAt":  { ".write": "auth != null && auth.uid == $uid" }
+        "plate": {
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "driverName": {
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "lat": {
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "lng": {
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "speedKmh": {
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "updatedAt": {
+          ".write": "auth != null && auth.uid == $uid"
+        }
       }
     },
     "groupConfigs": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$groupId": {
+        "speedLimitKmh": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 300"
+        }
+      }
+    },
+    "geofences": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$zoneId": {
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "lat": {
+          ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+        },
+        "lng": {
+          ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+        },
+        "radiusM": {
+          ".validate": "newData.isNumber() && newData.val() >= 50 && newData.val() <= 50000"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        }
+      }
     },
     "locationHistory": {
       "$uid": {
-        ".read":  "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists())",
+        ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists())",
         ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists())"
       }
     },
     "webUsers": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
-        ".read":  "auth != null && auth.uid == $uid",
+        ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
-        "email":       { ".write": "auth != null && auth.uid == $uid", ".validate": "newData.isString()" },
-        "displayName": { ".write": "auth != null && auth.uid == $uid", ".validate": "newData.isString()" },
-        "createdAt":   { ".write": "auth != null && auth.uid == $uid", ".validate": "newData.isNumber()" },
-        "approved":    { ".validate": "newData.isBoolean()" },
-        "groupId":     { ".validate": "newData.isString()" }
+        "email": {
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.isString()"
+        },
+        "displayName": {
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.isString()"
+        },
+        "createdAt": {
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.isNumber()"
+        },
+        "approved": {
+          ".validate": "newData.isBoolean()"
+        },
+        "groupId": {
+          ".validate": "newData.isString()"
+        }
       }
     },
     "admins": {

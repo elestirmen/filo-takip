@@ -152,7 +152,7 @@ describe('panel görünümleri', { skip }, () => {
   it('yönetici girişi beş sekmeli kabuğu açar', async () => {
     await signIn('yonetici@ornek.com', '123456');
     const tabs = $$('.nav-btn').map((node) => node.textContent.replace(/\d+$/, '').trim());
-    assert.deepEqual(tabs, ['Harita', 'Araçlar', 'Gruplar', 'Kullanıcılar', 'Ayarlar']);
+    assert.deepEqual(tabs, ['Harita', 'Araçlar', 'Raporlar', 'Gruplar', 'Kullanıcılar', 'Ayarlar']);
     assert.ok($('.badge-admin'), 'yönetici rozeti yok');
     assert.ok(text().includes('DEMO'), 'demo rozeti yok');
   });
@@ -232,8 +232,25 @@ describe('panel görünümleri', { skip }, () => {
     assert.equal($$('tbody tr').length, 6);
   });
 
-  it('grup kartları alan gizleme durumunu gösterir', async () => {
+  it('filo raporu istendiğinde hesaplanır', async () => {
     $$('.nav-btn')[2].click();
+    await tick();
+    // Rapor kendiliğinden hesaplanmaz: her araç için ayrı okuma gerekir.
+    assert.ok(text().includes('Rapor henüz oluşturulmadı'));
+
+    button('Raporu oluştur').click();
+    await tick(900);
+
+    assert.equal($$('tbody tr').length, 6, 'altı araç için satır bekleniyor');
+    // Demo geçmişi gerçek mesafe üretir; "0 m" çıkarsa üretici bozulmuştur.
+    assert.ok(/\d+,\d+ km/.test(text()), 'raporda mesafe yok');
+    assert.ok(text().includes('Toplam') || $$('.stat-card').length === 4);
+    assert.ok(button('CSV indir'), 'dışa aktarma düğmesi yok');
+    assert.equal(button('CSV indir').disabled, false, 'CSV düğmesi kapalı kaldı');
+  });
+
+  it('grup kartları alan gizleme durumunu gösterir', async () => {
+    $$('.nav-btn')[3].click();
     await tick();
     const cards = $$('.group-card');
     assert.equal(cards.length, 3);
@@ -252,7 +269,7 @@ describe('panel görünümleri', { skip }, () => {
   });
 
   it('kullanıcı tablosu üç yetkiyi de gösterir', async () => {
-    $$('.nav-btn')[3].click();
+    $$('.nav-btn')[4].click();
     await tick();
     assert.equal($$('tbody tr').length, 3);
     for (const label of ['Yönetici', 'İzleyici', 'Onay bekliyor']) {
@@ -267,7 +284,7 @@ describe('panel görünümleri', { skip }, () => {
   });
 
   it('ayarlar arka uç ve oturum bilgisini gösterir', async () => {
-    $$('.nav-btn')[4].click();
+    $$('.nav-btn')[5].click();
     await tick();
     assert.ok(text().includes('Demo (bellek içi sahte veri)'));
     assert.ok(text().includes('sim-yonetici'));
